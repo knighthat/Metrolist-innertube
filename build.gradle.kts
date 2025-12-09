@@ -8,12 +8,8 @@ kotlin {
 }
 
 dependencies {
-    implementation(libs.ktor.client.core)
-    implementation(libs.ktor.client.okhttp)
-    implementation(libs.ktor.client.content.negotiation)
-    implementation(libs.ktor.serialization.json)
-    implementation(libs.ktor.client.encoding)
-    implementation(libs.brotli)
-    implementation(libs.extractor)
-    testImplementation(libs.junit)
+    implementation( libs.bundles.ktor )
+    implementation( libs.brotli )
+    implementation( libs.extractor )
+    testImplementation( libs.bundles.junit5 )
 }
