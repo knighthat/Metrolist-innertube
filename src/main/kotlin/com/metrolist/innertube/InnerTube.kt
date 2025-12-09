@@ -30,7 +30,10 @@ import java.util.*
  * For making HTTP requests, not parsing response.
  */
 class InnerTube {
-    private var httpClient = createClient()
+
+    companion object {
+        lateinit var httpClient: HttpClient
+    }
 
     var locale = YouTubeLocale(
         gl = Locale.getDefault().country,
@@ -45,53 +48,7 @@ class InnerTube {
         }
     private var cookieMap = emptyMap<String, String>()
 
-    var proxy: Proxy? = null
-        set(value) {
-            field = value
-            httpClient.close()
-            httpClient = createClient()
-        }
-    
-    var proxyAuth: String? = null
-
     var useLoginForBrowse: Boolean = false
-
-    @OptIn(ExperimentalSerializationApi::class)
-    private fun createClient() = HttpClient(OkHttp) {
-        expectSuccess = true
-
-        install(ContentNegotiation) {
-            json(Json {
-                ignoreUnknownKeys = true
-                explicitNulls = false
-                encodeDefaults = true
-            })
-        }
-
-        install(ContentEncoding) {
-            gzip(0.9F)
-            deflate(0.8F)
-        }
-
-        proxy?.let {
-            engine {
-                proxy = this@InnerTube.proxy
-                proxyAuth?.let {
-                    config {
-                        proxyAuthenticator { _, response ->
-                            response.request.newBuilder()
-                                .header("Proxy-Authorization", proxyAuth!!)
-                                .build()
-                        }
-                    }
-                }
-            }
-        }
-
-        defaultRequest {
-            url(YouTubeClient.API_URL_YOUTUBE_MUSIC)
-        }
-    }
 
     private fun HttpRequestBuilder.ytClient(client: YouTubeClient, setLogin: Boolean = false) {
         contentType(ContentType.Application.Json)

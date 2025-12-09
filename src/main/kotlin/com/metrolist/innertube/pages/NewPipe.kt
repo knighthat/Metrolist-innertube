@@ -1,7 +1,9 @@
-package com.metrolist.innertube
+package com.metrolist.innertube.pages
 
+import com.metrolist.innertube.YouTube
 import com.metrolist.innertube.models.YouTubeClient
 import com.metrolist.innertube.models.response.PlayerResponse
+import com.metrolist.innertube.pages.NewPipeUtils.client
 import io.ktor.http.URLBuilder
 import io.ktor.http.parseQueryString
 import okhttp3.OkHttpClient
@@ -17,18 +19,7 @@ import org.schabi.newpipe.extractor.services.youtube.YoutubeJavaScriptPlayerMana
 import java.io.IOException
 import java.net.Proxy
 
-private class NewPipeDownloaderImpl(proxy: Proxy?, proxyAuth: String?) : Downloader() {
-
-    private val client = OkHttpClient.Builder()
-        .proxy(proxy)
-        .proxyAuthenticator { _, response ->
-            proxyAuth?.let { auth ->
-                response.request.newBuilder()
-                    .header("Proxy-Authorization", auth)
-                    .build()
-            } ?: response.request
-        }
-        .build()
+private class NewPipeDownloaderImpl : Downloader() {
 
     @Throws(IOException::class, ReCaptchaException::class)
     override fun execute(request: Request): Response {
@@ -75,8 +66,10 @@ private class NewPipeDownloaderImpl(proxy: Proxy?, proxyAuth: String?) : Downloa
 
 object NewPipeUtils {
 
+    lateinit var client: OkHttpClient
+
     init {
-        NewPipe.init(NewPipeDownloaderImpl(YouTube.proxy, YouTube.proxyAuth))
+        NewPipe.init(NewPipeDownloaderImpl())
     }
 
     fun getSignatureTimestamp(videoId: String): Result<Int> = runCatching {
