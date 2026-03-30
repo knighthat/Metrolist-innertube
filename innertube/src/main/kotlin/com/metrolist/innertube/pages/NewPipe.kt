@@ -2,10 +2,20 @@ package com.metrolist.innertube
 
 import com.metrolist.innertube.models.YouTubeClient
 import com.metrolist.innertube.models.response.PlayerResponse
+import io.ktor.client.HttpClient
+import io.ktor.client.request.request
+import io.ktor.client.request.setBody
+import io.ktor.client.statement.bodyAsText
+import io.ktor.client.statement.request
+import io.ktor.http.HttpMethod
 import io.ktor.http.URLBuilder
+import io.ktor.http.headers
 import io.ktor.http.parseQueryString
-import okhttp3.OkHttpClient
-import okhttp3.RequestBody.Companion.toRequestBody
+import io.ktor.util.toMap
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.runBlocking
+import org.koin.core.component.KoinComponent
+import org.koin.core.component.inject
 import org.schabi.newpipe.extractor.NewPipe
 import org.schabi.newpipe.extractor.downloader.Downloader
 import org.schabi.newpipe.extractor.downloader.Request
@@ -15,60 +25,47 @@ import org.schabi.newpipe.extractor.exceptions.ReCaptchaException
 import org.schabi.newpipe.extractor.services.youtube.YoutubeJavaScriptPlayerManager
 import org.schabi.newpipe.extractor.stream.StreamInfo
 import java.io.IOException
-import java.net.Proxy
 
-class NewPipeDownloaderImpl(
-    proxy: Proxy?,
-    proxyAuth: String? = null,
-) : Downloader() {
-    private val client =
-        OkHttpClient
-            .Builder()
-            .proxy(proxy)
-            .proxyAuthenticator { _, response ->
-                proxyAuth?.let { auth ->
-                    response.request.newBuilder()
-                        .header("Proxy-Authorization", auth)
-                        .build()
-                } ?: response.request
-            }
-            .build()
+class NewPipeDownloaderImpl : Downloader(), KoinComponent {
+
+    private val client: HttpClient by inject()
 
     @Throws(IOException::class, ReCaptchaException::class)
-    override fun execute(request: Request): Response {
-        val httpMethod = request.httpMethod()
+    override fun execute(request: Request): Response = runBlocking( Dispatchers.IO ){
         val url = request.url()
-        val headers = request.headers()
-        val dataToSend = request.dataToSend()
+        val response = client.request( url ) {
+            method = HttpMethod.parse( request.httpMethod() )
 
-        val requestBuilder =
-            okhttp3.Request
-                .Builder()
-                .method(httpMethod, dataToSend?.toRequestBody())
-                .url(url)
-                .addHeader("User-Agent", YouTubeClient.USER_AGENT_WEB)
+            headers {
+                request.headers()
+                    .mapValues { (_, values) ->
+                        values.joinToString( ";" ) { it }
+                    }
+                    .forEach { (k, v) ->
+                        this.append( k, v )
+                    }
 
-        headers.forEach { (headerName, headerValueList) ->
-            if (headerValueList.size > 1) {
-                requestBuilder.removeHeader(headerName)
-                headerValueList.forEach { headerValue ->
-                    requestBuilder.addHeader(headerName, headerValue)
-                }
-            } else if (headerValueList.size == 1) {
-                requestBuilder.header(headerName, headerValueList[0])
+                if( !contains("User-Agent") )
+                    append( "User-Agent", YouTubeClient.USER_AGENT_WEB )
             }
+
+            setBody( request.dataToSend() )
         }
 
-        val response = client.newCall(requestBuilder.build()).execute()
-
-        if (response.code == 429) {
-            response.close()
+        val statusCode = response.status.value
+        if( statusCode == 429 )
             throw ReCaptchaException("reCaptcha Challenge requested", url)
-        }
-
-        val responseBodyToReturn = response.body.string()
+        val headers = response.headers.toMap()
+        val responseBodyToReturn = response.bodyAsText()
         val latestUrl = response.request.url.toString()
-        return Response(response.code, response.message, response.headers.toMultimap(), responseBodyToReturn, latestUrl)
+
+        Response(
+            statusCode,
+            response.status.description,
+            headers,
+            responseBodyToReturn,
+            latestUrl
+        )
     }
 }
 
@@ -126,10 +123,7 @@ object NewPipeExtractor {
 
     fun init() {
         if (!isInitialized) {
-            newPipeDownloader = NewPipeDownloaderImpl(
-                proxy = YouTube.proxy,
-                proxyAuth = YouTube.proxyAuth
-            )
+            newPipeDownloader = NewPipeDownloaderImpl()
             newPipeUtils = NewPipeUtils(newPipeDownloader!!)
             isInitialized = true
         }

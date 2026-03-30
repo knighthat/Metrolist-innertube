@@ -5,29 +5,43 @@ import com.metrolist.innertube.models.MediaInfo
 import com.metrolist.innertube.models.ReturnYouTubeDislikeResponse
 import com.metrolist.innertube.models.YouTubeClient
 import com.metrolist.innertube.models.YouTubeLocale
-import com.metrolist.innertube.models.body.*
+import com.metrolist.innertube.models.body.AccountMenuBody
+import com.metrolist.innertube.models.body.Action
+import com.metrolist.innertube.models.body.BrowseBody
+import com.metrolist.innertube.models.body.CreatePlaylistBody
+import com.metrolist.innertube.models.body.EditPlaylistBody
+import com.metrolist.innertube.models.body.FeedbackBody
+import com.metrolist.innertube.models.body.GetQueueBody
+import com.metrolist.innertube.models.body.GetSearchSuggestionsBody
+import com.metrolist.innertube.models.body.GetTranscriptBody
+import com.metrolist.innertube.models.body.LikeBody
+import com.metrolist.innertube.models.body.NextBody
+import com.metrolist.innertube.models.body.PlayerBody
+import com.metrolist.innertube.models.body.PlaylistDeleteBody
+import com.metrolist.innertube.models.body.SearchBody
+import com.metrolist.innertube.models.body.SubscribeBody
 import com.metrolist.innertube.models.response.NextResponse
 import com.metrolist.innertube.utils.parseCookieString
 import com.metrolist.innertube.utils.sha1
-import io.ktor.client.*
+import io.ktor.client.HttpClient
 import io.ktor.client.call.body
-import io.ktor.client.engine.okhttp.*
-import io.ktor.client.plugins.*
-import io.ktor.client.plugins.compression.*
-import io.ktor.client.plugins.contentnegotiation.*
-import io.ktor.client.plugins.HttpTimeout
-import io.ktor.client.request.*
-import io.ktor.client.statement.bodyAsText
-import io.ktor.http.*
-import io.ktor.serialization.kotlinx.json.*
-import kotlinx.serialization.ExperimentalSerializationApi
-import kotlinx.serialization.json.Json
-import java.net.Proxy
-import java.io.IOException
+import io.ktor.client.plugins.onUpload
+import io.ktor.client.request.HttpRequestBuilder
+import io.ktor.client.request.get
+import io.ktor.client.request.headers
+import io.ktor.client.request.parameter
+import io.ktor.client.request.post
+import io.ktor.client.request.setBody
+import io.ktor.http.ContentType
+import io.ktor.http.contentType
+import io.ktor.http.userAgent
 import kotlinx.coroutines.delay
-import java.util.*
+import kotlinx.serialization.json.Json
+import org.koin.core.component.KoinComponent
+import org.koin.core.component.inject
+import java.io.IOException
+import java.util.Locale
 import kotlin.io.encoding.Base64
-import timber.log.Timber
 import kotlin.io.encoding.ExperimentalEncodingApi
 
 /**
@@ -35,8 +49,9 @@ import kotlin.io.encoding.ExperimentalEncodingApi
  * For making HTTP requests, not parsing response.
  */
 @OptIn(ExperimentalEncodingApi::class)
-class InnerTube {
-    private var httpClient = createClient()
+class InnerTube : KoinComponent {
+
+    private val httpClient: HttpClient by inject()
 
     var locale = YouTubeLocale(
         gl = Locale.getDefault().country,
@@ -51,96 +66,7 @@ class InnerTube {
         }
     private var cookieMap = emptyMap<String, String>()
 
-    var proxy: Proxy? = null
-        set(value) {
-            field = value
-            httpClient.close()
-            httpClient = createClient()
-        }
-    
-    var proxyAuth: String? = null
-
     var useLoginForBrowse: Boolean = false
-
-    @OptIn(ExperimentalSerializationApi::class)
-    private fun createClient() = HttpClient(OkHttp) {
-        expectSuccess = true
-
-        install(ContentNegotiation) {
-            json(Json {
-                ignoreUnknownKeys = true
-                explicitNulls = false
-                encodeDefaults = true
-            })
-        }
-
-        install(ContentEncoding) {
-            gzip(0.9F)
-            deflate(0.8F)
-        }
-
-        // Enhanced network configuration for better performance
-        engine {
-            config {
-                // Connection pool settings for better connection reuse
-                connectionPool(
-                    okhttp3.ConnectionPool(
-                        10, // maxIdleConnections
-                        5, // keepAliveDuration
-                        java.util.concurrent.TimeUnit.MINUTES
-                    )
-                )
-                
-                // Timeout configurations
-                connectTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
-                readTimeout(60, java.util.concurrent.TimeUnit.SECONDS)
-                writeTimeout(60, java.util.concurrent.TimeUnit.SECONDS)
-                
-                // Enable HTTP/2 for better performance
-                protocols(listOf(okhttp3.Protocol.HTTP_2, okhttp3.Protocol.HTTP_1_1))
-                
-                // Retry on connection failure
-                retryOnConnectionFailure(true)
-                
-                // Cache configuration for better performance
-                cache(
-                    okhttp3.Cache(
-                        directory = java.io.File(System.getProperty("java.io.tmpdir"), "http_cache"),
-                        maxSize = 50L * 1024L * 1024L // 50 MB
-                    )
-                )
-                
-                // Apply proxy configuration
-                this@InnerTube.proxy?.let { proxyConfig ->
-                    proxy(proxyConfig)
-                }
-                
-                // Apply proxy authentication
-                this@InnerTube.proxyAuth?.let { auth ->
-                    proxyAuthenticator { _, response ->
-                        response.request.newBuilder()
-                            .header("Proxy-Authorization", auth)
-                            .build()
-                    }
-                }
-            }
-        }
-
-        // Request timeout configuration
-        install(HttpTimeout) {
-            requestTimeoutMillis = 60000
-            connectTimeoutMillis = 30000
-            socketTimeoutMillis = 60000
-        }
-
-        defaultRequest {
-            url(YouTubeClient.API_URL_YOUTUBE_MUSIC)
-            // Add common headers for better compatibility
-            header("Accept", "application/json")
-            header("Accept-Language", "en-US,en;q=0.9")
-            header("Cache-Control", "no-cache")
-        }
-    }
 
     private fun HttpRequestBuilder.ytClient(client: YouTubeClient, setLogin: Boolean = false) {
         contentType(ContentType.Application.Json)
