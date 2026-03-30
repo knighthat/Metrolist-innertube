@@ -1,5 +1,6 @@
 package com.metrolist.innertube.pages
 
+import co.touchlab.kermit.Logger
 import com.metrolist.innertube.models.Album
 import com.metrolist.innertube.models.AlbumItem
 import com.metrolist.innertube.models.Artist
@@ -192,7 +193,7 @@ data class LibraryPage(
                             ?.content?.confirmDialogRenderer?.confirmButton?.buttonRenderer
                             ?.command?.musicDeletePrivatelyOwnedEntityCommand?.entityId
                     }
-                    timber.log.Timber.d("Parsed uploaded song: id=$videoId, entityId=$uploadEntityId")
+                    Logger.d("Parsed uploaded song: id=$videoId, entityId=$uploadEntityId")
 
                     SongItem(
                         id = videoId,

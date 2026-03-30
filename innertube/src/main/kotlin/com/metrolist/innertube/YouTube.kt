@@ -1,5 +1,7 @@
 package com.metrolist.innertube
 
+import co.touchlab.kermit.Logger
+import com.metrolist.innertube.YouTube.newEpisodes
 import com.metrolist.innertube.models.AccountInfo
 import com.metrolist.innertube.models.YTItem
 import com.metrolist.innertube.models.AlbumItem
@@ -79,7 +81,6 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonPrimitive
 import java.net.Proxy
 import kotlin.random.Random
-import timber.log.Timber
 
 /**
  * Parse useful data with [InnerTube] sending requests.
@@ -617,15 +618,15 @@ object YouTube {
     suspend fun podcast(podcastId: String): Result<PodcastPage> = podcastWithDebug(podcastId) { }
 
     suspend fun podcastWithDebug(podcastId: String, log: (String) -> Unit): Result<PodcastPage> = runCatching {
-        Timber.d("Fetching podcast with ID: $podcastId")
+        Logger.d("Fetching podcast with ID: $podcastId")
         val response = innerTube.browse(
             client = WEB_REMIX,
             browseId = podcastId,
             setLogin = true
         ).body<BrowseResponse>()
 
-        Timber.d("Response received, twoColumnBrowseResultsRenderer: ${response.contents?.twoColumnBrowseResultsRenderer != null}")
-        Timber.d("singleColumnBrowseResultsRenderer: ${response.contents?.singleColumnBrowseResultsRenderer != null}")
+        Logger.d("Response received, twoColumnBrowseResultsRenderer: ${response.contents?.twoColumnBrowseResultsRenderer != null}")
+        Logger.d("singleColumnBrowseResultsRenderer: ${response.contents?.singleColumnBrowseResultsRenderer != null}")
 
         // Try twoColumn first (standard layout)
         var header = response.contents?.twoColumnBrowseResultsRenderer?.tabs?.firstOrNull()
@@ -637,24 +638,24 @@ object YouTube {
             header = response.contents?.singleColumnBrowseResultsRenderer?.tabs?.firstOrNull()
                 ?.tabRenderer?.content?.sectionListRenderer?.contents?.firstOrNull()
                 ?.musicResponsiveHeaderRenderer
-            Timber.d("Using singleColumn layout, header found: ${header != null}")
+            Logger.d("Using singleColumn layout, header found: ${header != null}")
         }
 
-        Timber.d("Header title: ${header?.title?.runs?.firstOrNull()?.text}")
+        Logger.d("Header title: ${header?.title?.runs?.firstOrNull()?.text}")
 
         // Debug: Log button structure
         header?.buttons?.forEachIndexed { i, button ->
-            Timber.d("[PODCAST] Button[$i]: menuRenderer=${button.menuRenderer != null}, toggleButtonRenderer=${button.toggleButtonRenderer != null}, playButtonRenderer=${button.musicPlayButtonRenderer != null}")
+            Logger.d("[PODCAST] Button[$i]: menuRenderer=${button.menuRenderer != null}, toggleButtonRenderer=${button.toggleButtonRenderer != null}, playButtonRenderer=${button.musicPlayButtonRenderer != null}")
             button.menuRenderer?.items?.forEachIndexed { j, item ->
-                Timber.d("[PODCAST] Button[$i].menuItems[$j]: toggle=${item.toggleMenuServiceItemRenderer?.defaultIcon?.iconType}, nav=${item.menuNavigationItemRenderer?.icon?.iconType}")
+                Logger.d("[PODCAST] Button[$i].menuItems[$j]: toggle=${item.toggleMenuServiceItemRenderer?.defaultIcon?.iconType}, nav=${item.menuNavigationItemRenderer?.icon?.iconType}")
                 // Check for SUBSCRIBE button (like artists have)
                 if (item.toggleMenuServiceItemRenderer?.defaultIcon?.iconType == "SUBSCRIBE") {
                     val channelIds = item.toggleMenuServiceItemRenderer.defaultServiceEndpoint.subscribeEndpoint?.channelIds
-                    Timber.d("[PODCAST] Found SUBSCRIBE button! channelIds=$channelIds")
+                    Logger.d("[PODCAST] Found SUBSCRIBE button! channelIds=$channelIds")
                 }
             }
             button.toggleButtonRenderer?.let { toggle ->
-                Timber.d("[PODCAST] Button[$i].toggleButtonRenderer: defaultIcon=${toggle.defaultIcon?.iconType}, defaultToken=${toggle.defaultServiceEndpoint?.feedbackEndpoint?.feedbackToken?.take(30)}, subscribeChannelIds=${toggle.defaultServiceEndpoint?.subscribeEndpoint?.channelIds}")
+                Logger.d("[PODCAST] Button[$i].toggleButtonRenderer: defaultIcon=${toggle.defaultIcon?.iconType}, defaultToken=${toggle.defaultServiceEndpoint?.feedbackEndpoint?.feedbackToken?.take(30)}, subscribeChannelIds=${toggle.defaultServiceEndpoint?.subscribeEndpoint?.channelIds}")
             }
         }
 
@@ -667,7 +668,7 @@ object YouTube {
         val channelId = subscribeToggle?.defaultServiceEndpoint?.subscribeEndpoint?.channelIds?.firstOrNull()
         // isSelected indicates user is currently subscribed (toggle is in "toggled" state)
         val isChannelSubscribed = subscribeToggle?.isSelected == true
-        Timber.d("[PODCAST] Extracted channelId for subscription: $channelId, isSubscribed: $isChannelSubscribed")
+        Logger.d("[PODCAST] Extracted channelId for subscription: $channelId, isSubscribed: $isChannelSubscribed")
 
         // Extract library tokens from the header's menu buttons OR toggle buttons
         var libraryTokens = header?.buttons?.flatMap { button ->
@@ -691,12 +692,12 @@ object YouTube {
                             // BOOKMARK: default=remove, toggled=add
                             PageHelper.LibraryFeedbackTokens(toggledToken, defaultToken)
                         }
-                        Timber.d("[PODCAST] Found toggle button with library tokens - add: ${libraryTokens.addToken != null}, remove: ${libraryTokens.removeToken != null}")
+                        Logger.d("[PODCAST] Found toggle button with library tokens - add: ${libraryTokens.addToken != null}, remove: ${libraryTokens.removeToken != null}")
                     }
                 }
             }
         }
-        Timber.d("[PODCAST] Library tokens - add: ${libraryTokens?.addToken != null}, remove: ${libraryTokens?.removeToken != null}")
+        Logger.d("[PODCAST] Library tokens - add: ${libraryTokens?.addToken != null}, remove: ${libraryTokens?.removeToken != null}")
 
         val podcastItem = PodcastItem(
             id = podcastId,
@@ -723,17 +724,17 @@ object YouTube {
 
         // Try twoColumn for episodes
         val secondaryContents = response.contents?.twoColumnBrowseResultsRenderer?.secondaryContents
-        Timber.d("secondaryContents null: ${secondaryContents == null}")
-        Timber.d("secondaryContents.sectionListRenderer null: ${secondaryContents?.sectionListRenderer == null}")
-        Timber.d("sectionListRenderer.contents size: ${secondaryContents?.sectionListRenderer?.contents?.size ?: 0}")
+        Logger.d("secondaryContents null: ${secondaryContents == null}")
+        Logger.d("secondaryContents.sectionListRenderer null: ${secondaryContents?.sectionListRenderer == null}")
+        Logger.d("sectionListRenderer.contents size: ${secondaryContents?.sectionListRenderer?.contents?.size ?: 0}")
 
         secondaryContents?.sectionListRenderer?.contents?.forEachIndexed { index, content ->
-            Timber.d("Content[$index]: musicShelfRenderer=${content.musicShelfRenderer != null}, musicPlaylistShelfRenderer=${content.musicPlaylistShelfRenderer != null}, gridRenderer=${content.gridRenderer != null}")
+            Logger.d("Content[$index]: musicShelfRenderer=${content.musicShelfRenderer != null}, musicPlaylistShelfRenderer=${content.musicPlaylistShelfRenderer != null}, gridRenderer=${content.gridRenderer != null}")
             content.musicShelfRenderer?.let { shelf ->
-                Timber.d("musicShelfRenderer.contents size: ${shelf.contents?.size ?: 0}")
+                Logger.d("musicShelfRenderer.contents size: ${shelf.contents?.size ?: 0}")
             }
             content.musicPlaylistShelfRenderer?.let { shelf ->
-                Timber.d("musicPlaylistShelfRenderer.contents size: ${shelf.contents.size}")
+                Logger.d("musicPlaylistShelfRenderer.contents size: ${shelf.contents.size}")
             }
         }
 
@@ -744,7 +745,7 @@ object YouTube {
         if (episodeContents == null) {
             episodeContents = secondaryContents?.sectionListRenderer
                 ?.contents?.firstOrNull()?.musicPlaylistShelfRenderer?.contents
-            Timber.d("Trying musicPlaylistShelfRenderer: ${episodeContents?.size ?: 0}")
+            Logger.d("Trying musicPlaylistShelfRenderer: ${episodeContents?.size ?: 0}")
         }
 
         // Fallback to singleColumn
@@ -752,27 +753,27 @@ object YouTube {
             episodeContents = response.contents?.singleColumnBrowseResultsRenderer?.tabs?.firstOrNull()
                 ?.tabRenderer?.content?.sectionListRenderer?.contents
                 ?.find { it.musicShelfRenderer != null }?.musicShelfRenderer?.contents
-            Timber.d("Using singleColumn for episodes, found: ${episodeContents?.size ?: 0}")
+            Logger.d("Using singleColumn for episodes, found: ${episodeContents?.size ?: 0}")
         }
 
-        Timber.d("Episode contents count: ${episodeContents?.size ?: 0}")
+        Logger.d("Episode contents count: ${episodeContents?.size ?: 0}")
 
         // Get episodes from musicMultiRowListItemRenderer (used for podcasts)
         val multiRowItems = episodeContents?.mapNotNull { it.musicMultiRowListItemRenderer } ?: emptyList()
-        Timber.d("multiRowItems count: ${multiRowItems.size}")
+        Logger.d("multiRowItems count: ${multiRowItems.size}")
 
         multiRowItems.take(2).forEachIndexed { idx, renderer ->
-            Timber.d("Episode[$idx] title: ${renderer.title?.runs?.firstOrNull()?.text}")
-            Timber.d("Episode[$idx] subtitle: ${renderer.subtitle?.runs?.map { it.text }}")
-            Timber.d("Episode[$idx] videoId: ${renderer.onTap?.watchEndpoint?.videoId}")
-            Timber.d("Episode[$idx] thumbnail: ${renderer.thumbnail?.musicThumbnailRenderer?.getThumbnailUrl()}")
+            Logger.d("Episode[$idx] title: ${renderer.title?.runs?.firstOrNull()?.text}")
+            Logger.d("Episode[$idx] subtitle: ${renderer.subtitle?.runs?.map { it.text }}")
+            Logger.d("Episode[$idx] videoId: ${renderer.onTap?.watchEndpoint?.videoId}")
+            Logger.d("Episode[$idx] thumbnail: ${renderer.thumbnail?.musicThumbnailRenderer?.getThumbnailUrl()}")
         }
 
         val episodes = multiRowItems.mapNotNull { renderer ->
             PodcastPage.fromMusicMultiRowListItemRenderer(renderer, podcastItem)
         }
 
-        Timber.d("Parsed episodes: ${episodes.size}")
+        Logger.d("Parsed episodes: ${episodes.size}")
 
         PodcastPage(
             podcast = podcastItem,
@@ -787,26 +788,26 @@ object YouTube {
     }
 
     suspend fun home(continuation: String? = null, params: String? = null): Result<HomePage> = runCatching {
-        Timber.d("home() called with continuation=$continuation, params=$params")
+        Logger.d("home() called with continuation=$continuation, params=$params")
         if (continuation != null) {
             return@runCatching homeContinuation(continuation).getOrThrow()
         }
 
         val response = innerTube.browse(WEB_REMIX, browseId = "FEmusic_home", params = params).body<BrowseResponse>()
-        Timber.d("home() response received")
+        Logger.d("home() response received")
         val continuation = response.contents?.singleColumnBrowseResultsRenderer?.tabs?.firstOrNull()
             ?.tabRenderer?.content?.sectionListRenderer?.continuations?.getContinuation()
         val sectionListRender = response.contents?.singleColumnBrowseResultsRenderer?.tabs?.firstOrNull()
             ?.tabRenderer?.content?.sectionListRenderer
-        Timber.d("home() sectionListRender contents size: ${sectionListRender?.contents?.size ?: 0}")
+        Logger.d("home() sectionListRender contents size: ${sectionListRender?.contents?.size ?: 0}")
         val carousels = sectionListRender?.contents?.mapNotNull { it.musicCarouselShelfRenderer } ?: emptyList()
-        Timber.d("home() carousels count: ${carousels.size}")
+        Logger.d("home() carousels count: ${carousels.size}")
         val sections = carousels.mapNotNull {
             HomePage.Section.fromMusicCarouselShelfRenderer(it)
         }.toMutableList()
-        Timber.d("home() sections parsed: ${sections.size}")
+        Logger.d("home() sections parsed: ${sections.size}")
         val chips = sectionListRender?.header?.chipCloudRenderer?.chips?.mapNotNull { HomePage.Chip.fromChipCloudChipRenderer(it) }
-        Timber.d("home() chips: ${chips?.size ?: 0}")
+        Logger.d("home() chips: ${chips?.size ?: 0}")
         HomePage(chips, sections, continuation)
     }
 
@@ -1278,7 +1279,7 @@ object YouTube {
      */
     suspend fun savePodcast(podcastId: String, save: Boolean) = runCatching {
         val playlistId = podcastId.removePrefix("MPSP")
-        Timber.d("[PODCAST_API] savePodcast: podcastId=$podcastId, playlistId=$playlistId, save=$save")
+        Logger.d("[PODCAST_API] savePodcast: podcastId=$podcastId, playlistId=$playlistId, save=$save")
         if (save)
             innerTube.likePlaylist(WEB_REMIX, playlistId)
         else
@@ -1301,7 +1302,7 @@ object YouTube {
     }
 
     suspend fun libraryPodcastChannels(): Result<LibraryPage> {
-        Timber.d("[PODCAST_API] libraryPodcastChannels: calling browse with FEmusic_library_non_music_audio_channels_list")
+        Logger.d("[PODCAST_API] libraryPodcastChannels: calling browse with FEmusic_library_non_music_audio_channels_list")
         return runCatching {
             val response = innerTube.browse(
                 client = WEB_REMIX,
@@ -1339,13 +1340,13 @@ object YouTube {
                 continuation = null
             )
         }.also { result ->
-            result.onFailure { e -> Timber.e(e, "[PODCAST_API] libraryPodcastChannels FAILED") }
-            result.onSuccess { Timber.d("[PODCAST_API] libraryPodcastChannels SUCCESS: ${it.items.size} items") }
+            result.onFailure { e -> Logger.e("[PODCAST_API] libraryPodcastChannels FAILED", e) }
+            result.onSuccess { Logger.d("[PODCAST_API] libraryPodcastChannels SUCCESS: ${it.items.size} items") }
         }
     }
 
     suspend fun libraryPodcastEpisodes(): Result<LibraryPage> {
-        Timber.d("[PODCAST_API] libraryPodcastEpisodes: calling browse with FEmusic_library_non_music_audio_list")
+        Logger.d("[PODCAST_API] libraryPodcastEpisodes: calling browse with FEmusic_library_non_music_audio_list")
         return runCatching {
             val response = innerTube.browse(
                 client = WEB_REMIX,
@@ -1376,8 +1377,8 @@ object YouTube {
                 continuation = null
             )
         }.also { result ->
-            result.onFailure { e -> Timber.e(e, "[PODCAST_API] libraryPodcastEpisodes FAILED") }
-            result.onSuccess { Timber.d("[PODCAST_API] libraryPodcastEpisodes SUCCESS: ${it.items.size} items") }
+            result.onFailure { e -> Logger.e("[PODCAST_API] libraryPodcastEpisodes FAILED", e) }
+            result.onSuccess { Logger.d("[PODCAST_API] libraryPodcastEpisodes SUCCESS: ${it.items.size} items") }
         }
     }
 
@@ -1395,7 +1396,7 @@ object YouTube {
      * Returns new episodes from saved/subscribed podcasts.
      */
     suspend fun newEpisodes(): Result<List<SongItem>> {
-        Timber.d("[PODCAST_API] newEpisodes: calling browse with VLRDPN")
+        Logger.d("[PODCAST_API] newEpisodes: calling browse with VLRDPN")
         return runCatching {
             val response = innerTube.browse(
                 client = WEB_REMIX,
@@ -1422,8 +1423,8 @@ object YouTube {
                     )
                 } ?: emptyList()
         }.also { result ->
-            result.onFailure { e -> Timber.e(e, "[PODCAST_API] newEpisodes FAILED") }
-            result.onSuccess { Timber.d("[PODCAST_API] newEpisodes SUCCESS: ${it.size} items") }
+            result.onFailure { e -> Logger.e("[PODCAST_API] newEpisodes FAILED", e) }
+            result.onSuccess { Logger.d("[PODCAST_API] newEpisodes SUCCESS: ${it.size} items") }
         }
     }
 
@@ -1476,7 +1477,7 @@ object YouTube {
      * Returns manually saved episodes.
      */
     suspend fun episodesForLater(): Result<List<SongItem>> = runCatching {
-        Timber.d("[PODCAST_API] episodesForLater: calling browse with VLSE")
+        Logger.d("[PODCAST_API] episodesForLater: calling browse with VLSE")
         val response = innerTube.browse(
             client = WEB_REMIX,
             browseId = "VLSE",
