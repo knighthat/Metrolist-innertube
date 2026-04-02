@@ -6,6 +6,8 @@ import io.ktor.http.URLBuilder
 import io.ktor.http.parseQueryString
 import okhttp3.OkHttpClient
 import okhttp3.RequestBody.Companion.toRequestBody
+import org.koin.core.component.KoinComponent
+import org.koin.core.component.inject
 import org.schabi.newpipe.extractor.NewPipe
 import org.schabi.newpipe.extractor.downloader.Downloader
 import org.schabi.newpipe.extractor.downloader.Request
@@ -20,19 +22,8 @@ import java.net.Proxy
 class NewPipeDownloaderImpl(
     proxy: Proxy?,
     proxyAuth: String? = null,
-) : Downloader() {
-    private val client =
-        OkHttpClient
-            .Builder()
-            .proxy(proxy)
-            .proxyAuthenticator { _, response ->
-                proxyAuth?.let { auth ->
-                    response.request.newBuilder()
-                        .header("Proxy-Authorization", auth)
-                        .build()
-                } ?: response.request
-            }
-            .build()
+) : Downloader(), KoinComponent {
+    private val client: OkHttpClient by inject()
 
     @Throws(IOException::class, ReCaptchaException::class)
     override fun execute(request: Request): Response {

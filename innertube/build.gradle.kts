@@ -20,10 +20,7 @@ android {
 }
 
 dependencies {
-    // NewPipe
-    implementation( libs.newpipe.nanojson )
-    implementation( libs.newpipe.extractor )
-    // Others
+    api( libs.bundles.newpipe )
     implementation( libs.bundles.networking )
     implementation( libs.koin.core )
     implementation( libs.kermit )

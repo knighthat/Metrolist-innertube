@@ -5,29 +5,52 @@ import com.metrolist.innertube.models.MediaInfo
 import com.metrolist.innertube.models.ReturnYouTubeDislikeResponse
 import com.metrolist.innertube.models.YouTubeClient
 import com.metrolist.innertube.models.YouTubeLocale
-import com.metrolist.innertube.models.body.*
+import com.metrolist.innertube.models.body.AccountMenuBody
+import com.metrolist.innertube.models.body.Action
+import com.metrolist.innertube.models.body.BrowseBody
+import com.metrolist.innertube.models.body.CreatePlaylistBody
+import com.metrolist.innertube.models.body.EditPlaylistBody
+import com.metrolist.innertube.models.body.FeedbackBody
+import com.metrolist.innertube.models.body.GetQueueBody
+import com.metrolist.innertube.models.body.GetSearchSuggestionsBody
+import com.metrolist.innertube.models.body.GetTranscriptBody
+import com.metrolist.innertube.models.body.LikeBody
+import com.metrolist.innertube.models.body.NextBody
+import com.metrolist.innertube.models.body.PlayerBody
+import com.metrolist.innertube.models.body.PlaylistDeleteBody
+import com.metrolist.innertube.models.body.SearchBody
+import com.metrolist.innertube.models.body.SubscribeBody
 import com.metrolist.innertube.models.response.NextResponse
 import com.metrolist.innertube.utils.parseCookieString
 import com.metrolist.innertube.utils.sha1
-import io.ktor.client.*
+import io.ktor.client.HttpClient
 import io.ktor.client.call.body
-import io.ktor.client.engine.okhttp.*
-import io.ktor.client.plugins.*
-import io.ktor.client.plugins.compression.*
-import io.ktor.client.plugins.contentnegotiation.*
+import io.ktor.client.engine.okhttp.OkHttp
 import io.ktor.client.plugins.HttpTimeout
-import io.ktor.client.request.*
-import io.ktor.client.statement.bodyAsText
-import io.ktor.http.*
-import io.ktor.serialization.kotlinx.json.*
+import io.ktor.client.plugins.compression.ContentEncoding
+import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.client.plugins.defaultRequest
+import io.ktor.client.plugins.onUpload
+import io.ktor.client.request.HttpRequestBuilder
+import io.ktor.client.request.get
+import io.ktor.client.request.header
+import io.ktor.client.request.headers
+import io.ktor.client.request.parameter
+import io.ktor.client.request.post
+import io.ktor.client.request.setBody
+import io.ktor.http.ContentType
+import io.ktor.http.contentType
+import io.ktor.http.userAgent
+import io.ktor.serialization.kotlinx.json.json
+import kotlinx.coroutines.delay
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.Json
-import java.net.Proxy
+import okhttp3.OkHttpClient
+import org.koin.java.KoinJavaComponent.get
 import java.io.IOException
-import kotlinx.coroutines.delay
-import java.util.*
+import java.net.Proxy
+import java.util.Locale
 import kotlin.io.encoding.Base64
-import timber.log.Timber
 import kotlin.io.encoding.ExperimentalEncodingApi
 
 /**
@@ -81,6 +104,8 @@ class InnerTube {
 
         // Enhanced network configuration for better performance
         engine {
+            preconfigured = get<OkHttpClient>(OkHttpClient::class.java)
+
             config {
                 // Connection pool settings for better connection reuse
                 connectionPool(
