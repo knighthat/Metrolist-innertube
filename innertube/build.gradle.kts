@@ -1,37 +1,32 @@
 plugins {
-    id("com.android.library")
-    alias(libs.plugins.kotlin.serialization)
+    alias( libs.plugins.android.library )
+    alias( libs.plugins.serialization )
 }
 
 android {
     namespace = "com.metrolist.innertube"
-    compileSdk = 36
-
-    defaultConfig {
-        minSdk = 26
+    compileSdk = libs.versions.compileSdk.get().toInt()
+    androidResources {      // Disable to speedup build
+        enable = false
     }
 
+    defaultConfig {
+        minSdk = libs.versions.minSdk.get().toInt()
+    }
     compileOptions {
-        isCoreLibraryDesugaringEnabled = true
         sourceCompatibility = JavaVersion.VERSION_21
         targetCompatibility = JavaVersion.VERSION_21
     }
 }
 
-kotlin {
-    jvmToolchain(21)
-}
-
 dependencies {
-    implementation(libs.ktor.client.core)
-    implementation(libs.ktor.client.okhttp)
-    implementation(libs.ktor.client.content.negotiation)
-    implementation(libs.ktor.serialization.json)
-    implementation(libs.ktor.client.encoding)
-    implementation(libs.brotli)
-    implementation(libs.newpipeextractor)
-    implementation(libs.timber)
-    testImplementation(libs.junit)
-
-    coreLibraryDesugaring(libs.desugaring)
+    // NewPipe
+    implementation( libs.newpipe.nanojson )
+    implementation( libs.newpipe.extractor )
+    // Others
+    implementation( libs.bundles.networking )
+    implementation( libs.koin.core )
+    implementation( libs.kermit )
+    implementation( libs.timber )
+    implementation( libs.kotlinx.serialization.json )
 }
