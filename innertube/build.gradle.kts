@@ -6,9 +6,7 @@ plugins {
 android {
     namespace = "com.metrolist.innertube"
     compileSdk = libs.versions.compileSdk.get().toInt()
-    androidResources {      // Disable to speedup build
-        enable = false
-    }
+    androidResources.enable = false     // Disable to speedup build
 
     defaultConfig {
         minSdk = libs.versions.minSdk.get().toInt()
@@ -22,8 +20,7 @@ android {
 dependencies {
     api( libs.bundles.newpipe )
     implementation( libs.bundles.networking )
-    implementation( libs.koin.core )
-    implementation( libs.kermit )
     implementation( libs.timber )
     implementation( libs.kotlinx.serialization.json )
+    implementation( libs.bundles.basic )
 }
