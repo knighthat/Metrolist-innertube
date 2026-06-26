@@ -1,5 +1,6 @@
 package com.metrolist.innertube.pages
 
+import co.touchlab.kermit.Logger
 import com.metrolist.innertube.models.Album
 import com.metrolist.innertube.models.AlbumItem
 import com.metrolist.innertube.models.Artist
@@ -115,7 +116,7 @@ data class ArtistItemsPage(
                     }
                     
                     if (artists.isEmpty() && renderer.subtitle?.runs != null) {
-                        logger.w("ArtistItemsPage.fromMusicTwoRowItemRenderer: Song '$title' (id=$videoId) - SUBTITLE RUNS EXIST but parsing returned EMPTY")
+                        Logger.w("ArtistItemsPage.fromMusicTwoRowItemRenderer: Song '$title' (id=$videoId) - SUBTITLE RUNS EXIST but parsing returned EMPTY", null, "ArtistItemPage")
                     }
 
                     SongItem(

@@ -15,7 +15,6 @@ import com.metrolist.innertube.models.YTItem
 import com.metrolist.innertube.models.oddElements
 import com.metrolist.innertube.models.splitBySeparator
 import com.metrolist.innertube.utils.parseTime
-import timber.log.Timber
 
 data class LibraryPage(
     val items: List<YTItem>,
@@ -126,7 +125,7 @@ data class LibraryPage(
                     val artists = PageHelper.extractArtists(subtitleRuns?.firstOrNull())
                     
                     if (artists.isEmpty() && (subtitleRuns?.firstOrNull()?.size ?: 0) > 0) {
-                        Timber.w("LibraryPage: Song '$title' (id=$videoId) - ARTIST RUNS EXIST but extractArtists returned EMPTY")
+                        Logger.w("LibraryPage: Song '$title' (id=$videoId) - ARTIST RUNS EXIST but extractArtists returned EMPTY", null, "LibraryPage")
                     }
                     
                     SongItem(

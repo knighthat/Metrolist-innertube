@@ -1,10 +1,10 @@
 package com.metrolist.innertube.pages
 
+import co.touchlab.kermit.Logger
 import com.metrolist.innertube.models.Artist
 import com.metrolist.innertube.models.Menu
 import com.metrolist.innertube.models.MusicResponsiveListItemRenderer.FlexColumn
 import com.metrolist.innertube.models.Run
-import timber.log.Timber
 
 object PageHelper {
     // Icon types for library management (YouTube changed these in Feb 2026)
@@ -14,6 +14,7 @@ object PageHelper {
     private val LIBRARY_ADD_ICONS = setOf("LIBRARY_ADD", "BOOKMARK_BORDER")
     private val LIBRARY_SAVED_ICONS = setOf("LIBRARY_SAVED", "BOOKMARK", "LIBRARY_REMOVE")
     private val ALL_LIBRARY_ICONS = LIBRARY_ADD_ICONS + LIBRARY_SAVED_ICONS
+    private val logger = Logger.withTag("PageHelper")
 
     /**
      * Data class to hold both library feedback tokens extracted from a menu
@@ -169,19 +170,19 @@ object PageHelper {
 
     fun extractArtists(runs: List<Run>?): List<Artist> {
         if (runs == null) {
-            Timber.d("extractArtists: runs is null")
+            logger.d("extractArtists: runs is null")
             return emptyList()
         }
         
-        Timber.d("extractArtists: input runs count=${runs.size}")
+        logger.d("extractArtists: input runs count=${runs.size}")
         runs.forEachIndexed { idx, run ->
-            Timber.v("  run[$idx]: text='${run.text}', hasEndpoint=${run.navigationEndpoint != null}, browseId=${run.navigationEndpoint?.browseEndpoint?.browseId}")
+            logger.v("  run[$idx]: text='${run.text}', hasEndpoint=${run.navigationEndpoint != null}, browseId=${run.navigationEndpoint?.browseEndpoint?.browseId}")
         }
         
         val filtered = runs.filter { run ->
             run.text.trim().isNotBlank() && run.text != " • "
         }
-        Timber.d("extractArtists: after separator filter count=${filtered.size}")
+        logger.d("extractArtists: after separator filter count=${filtered.size}")
         
         val result = filtered.map { run ->
             Artist(
@@ -191,11 +192,11 @@ object PageHelper {
         }
         
         if (result.isEmpty()) {
-            Timber.w("extractArtists: EMPTY RESULT from ${runs.size} runs")
+            logger.w("extractArtists: EMPTY RESULT from ${runs.size} runs")
         } else {
-            Timber.d("extractArtists: result count=${result.size}")
+            logger.d("extractArtists: result count=${result.size}")
             result.forEach { artist ->
-                Timber.v("  artist: name='${artist.name}', id=${artist.id}")
+                logger.v("  artist: name='${artist.name}', id=${artist.id}")
             }
         }
         

@@ -1,11 +1,11 @@
 package com.metrolist.innertube.pages
 
+import co.touchlab.kermit.Logger
 import com.metrolist.innertube.models.Album
 import com.metrolist.innertube.models.MusicResponsiveListItemRenderer
 import com.metrolist.innertube.models.PlaylistItem
 import com.metrolist.innertube.models.SongItem
 import com.metrolist.innertube.utils.parseTime
-import timber.log.Timber
 
 data class PlaylistPage(
     val playlist: PlaylistItem,
@@ -28,7 +28,7 @@ data class PlaylistPage(
                 ?.runs?.firstOrNull()?.text ?: return null
 
             if (secondaryLineRuns == null) {
-                Timber.w("PlaylistPage.fromMusicResponsiveListItemRenderer: Song '$title' - NO SECONDARY LINE (flexColumns[1] is null)")
+                Logger.w("PlaylistPage.fromMusicResponsiveListItemRenderer: Song '$title' - NO SECONDARY LINE (flexColumns[1] is null)", null, "PlaylistPage")
             }
 
             val artists = PageHelper.extractArtists(secondaryLineRuns)
