@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyItemScope
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
@@ -64,7 +65,7 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.SavedStateHandle
-import androidx.navigation.NavController
+import com.metrolist.music.LocalNavController
 import com.metrolist.innertube.YouTube.SearchFilter.Companion.FILTER_ALBUM
 import com.metrolist.innertube.YouTube.SearchFilter.Companion.FILTER_ARTIST
 import com.metrolist.innertube.YouTube.SearchFilter.Companion.FILTER_COMMUNITY_PLAYLIST
@@ -108,21 +109,20 @@ import com.metrolist.music.ui.menu.YouTubeAlbumMenu
 import com.metrolist.music.ui.menu.YouTubeArtistMenu
 import com.metrolist.music.ui.menu.YouTubePlaylistMenu
 import com.metrolist.music.ui.menu.YouTubeSongMenu
+import com.metrolist.music.utils.SearchRoutes
 import com.metrolist.music.utils.rememberPreference
 import com.metrolist.music.viewmodels.OnlineSearchViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import java.net.URLDecoder
-import java.net.URLEncoder
 
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun OnlineSearchResult(
-    navController: NavController,
     viewModel: OnlineSearchViewModel = hiltViewModel(),
     pureBlack: Boolean = false,
     savedStateHandle: SavedStateHandle? = null
 ) {
+    val navController = LocalNavController.current
     val database = LocalDatabase.current
     val menuState = LocalMenuState.current
     val playerConnection = LocalPlayerConnection.current ?: return
@@ -168,14 +168,7 @@ fun OnlineSearchResult(
 
     // Extract query from navigation arguments
     val encodedQuery = navController.currentBackStackEntry?.arguments?.getString("query") ?: ""
-    val decodedQuery =
-        remember(encodedQuery) {
-            try {
-                URLDecoder.decode(encodedQuery, "UTF-8")
-            } catch (e: Exception) {
-                encodedQuery
-            }
-        }
+    val decodedQuery = remember(encodedQuery) { SearchRoutes.decodeQuery(encodedQuery) }
 
     var query by rememberSaveable(stateSaver = TextFieldValue.Saver) {
         mutableStateOf(TextFieldValue(decodedQuery, TextRange(decodedQuery.length)))
@@ -188,8 +181,8 @@ fun OnlineSearchResult(
                     isSearchFocused = false
                     focusManager.clearFocus()
 
-                    navController.navigate("search/${URLEncoder.encode(searchQuery, "UTF-8")}") {
-                        popUpTo("search/${URLEncoder.encode(decodedQuery, "UTF-8")}") {
+                    navController.navigate(SearchRoutes.resultRoute(searchQuery)) {
+                        popUpTo(SearchRoutes.ROUTE) {
                             inclusive = true
                         }
 
@@ -244,7 +237,6 @@ fun OnlineSearchResult(
                     is SongItem -> {
                         YouTubeSongMenu(
                             song = item,
-                            navController = navController,
                             onDismiss = menuState::dismiss,
                         )
                     }
@@ -252,7 +244,6 @@ fun OnlineSearchResult(
                     is AlbumItem -> {
                         YouTubeAlbumMenu(
                             albumItem = item,
-                            navController = navController,
                             onDismiss = menuState::dismiss,
                         )
                     }
@@ -283,7 +274,6 @@ fun OnlineSearchResult(
                     is EpisodeItem -> {
                         YouTubeSongMenu(
                             song = item.asSongItem(),
-                            navController = navController,
                             onDismiss = menuState::dismiss,
                         )
                     }
@@ -507,10 +497,10 @@ fun OnlineSearchResult(
                                 NavigationTitle(summary.title)
                             }
 
-                            items(
+                            itemsIndexed(
                                 items = summary.items,
-                                key = { "${summary.title}/${it.id}/${summary.items.indexOf(it)}" },
-                                itemContent = ytItemContent,
+                                key = { index, item -> "${summary.title}/${item.id}/$index" },
+                                itemContent = { index, item -> ytItemContent(item) },
                             )
                         }
 
@@ -568,7 +558,6 @@ fun OnlineSearchResult(
                 OnlineSearchScreen(
                     query = query.text,
                     onQueryChange = { query = it },
-                    navController = navController,
                     onSearch = onSearch,
                     onDismiss = {
                         isSearchFocused = false

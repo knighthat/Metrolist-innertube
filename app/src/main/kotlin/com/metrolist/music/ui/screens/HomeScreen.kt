@@ -88,7 +88,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.navigation.NavController
+import com.metrolist.music.LocalNavController
 import androidx.navigation.compose.currentBackStackEntryAsState
 import coil3.compose.AsyncImage
 import coil3.request.CachePolicy
@@ -159,6 +159,7 @@ import com.metrolist.music.ui.menu.YouTubeSongMenu
 import com.metrolist.music.ui.utils.SnapLayoutInfoProvider
 import com.metrolist.music.ui.utils.resize
 import com.metrolist.music.utils.joinByBullet
+import com.metrolist.music.utils.joinToArtistString
 import com.metrolist.music.utils.makeTimeString
 import com.metrolist.music.utils.rememberEnumPreference
 import com.metrolist.music.utils.rememberPreference
@@ -368,7 +369,7 @@ fun CommunityPlaylistCard(
                                 overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
                             )
                             Text(
-                                text = song.artists.joinToString(", ") { it.name },
+                                text = song.artists.joinToArtistString(" ${stringResource(R.string.and)} ") { it.name },
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
                                 maxLines = 1,
@@ -497,9 +498,9 @@ fun CommunityPlaylistCard(
 fun DailyDiscoverCard(
     dailyDiscover: com.metrolist.music.viewmodels.DailyDiscoverItem,
     onClick: () -> Unit,
-    navController: NavController,
     modifier: Modifier = Modifier,
 ) {
+    val navController = LocalNavController.current
     val database = LocalDatabase.current
     val playCount by database.getLifetimePlayCount(dailyDiscover.recommendation.id).collectAsStateWithLifecycle(initialValue = 0)
     val menuState = LocalMenuState.current
@@ -521,7 +522,6 @@ fun DailyDiscoverCard(
                             menuState.show {
                                 YouTubeSongMenu(
                                     song = song,
-                                    navController = navController,
                                     onDismiss = { menuState.dismiss() },
                                 )
                             }
@@ -584,9 +584,9 @@ fun DailyDiscoverCard(
                         Text(
                             text =
                                 buildString {
-                                    append((dailyDiscover.recommendation as? SongItem)?.artists?.joinToString(", ") { it.name } ?: "")
+                                    append((dailyDiscover.recommendation as? SongItem)?.artists?.joinToArtistString(" ${stringResource(R.string.and)} ") { it.name } ?: "")
                                     if (playCount > 0) {
-                                        append(" • $playCount $playsString")
+                                        append(" | $playCount $playsString")
                                     }
                                 },
                             style = MaterialTheme.typography.bodyMedium,
@@ -611,7 +611,7 @@ fun DailyDiscoverCard(
                         text =
                             stringResource(
                                 messageRes,
-                                "${dailyDiscover.seed.title} • ${dailyDiscover.seed.artists.joinToString(", ") { it.name }}",
+                                "${dailyDiscover.seed.title} • ${dailyDiscover.seed.artists.joinToArtistString(" ${stringResource(R.string.and)} ") { it.name }}",
                             ),
                         style = MaterialTheme.typography.bodySmall,
                         fontWeight = androidx.compose.ui.text.font.FontWeight.Medium,
@@ -628,10 +628,10 @@ fun DailyDiscoverCard(
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun HomeScreen(
-    navController: NavController,
     snackbarHostState: SnackbarHostState,
     viewModel: HomeViewModel = hiltViewModel(),
 ) {
+    val navController = LocalNavController.current
     val menuState = LocalMenuState.current
     val bottomSheetPageState = LocalBottomSheetPageState.current
     val database = LocalDatabase.current
@@ -826,7 +826,6 @@ fun HomeScreen(
                                     menuState.show {
                                         SongMenu(
                                             originalSong = it,
-                                            navController = navController,
                                             onDismiss = menuState::dismiss,
                                         )
                                     }
@@ -855,7 +854,6 @@ fun HomeScreen(
                                     menuState.show {
                                         AlbumMenu(
                                             originalAlbum = it,
-                                            navController = navController,
                                             onDismiss = menuState::dismiss,
                                         )
                                     }
@@ -961,7 +959,6 @@ fun HomeScreen(
                                     is SongItem -> {
                                         YouTubeSongMenu(
                                             song = item,
-                                            navController = navController,
                                             onDismiss = menuState::dismiss,
                                         )
                                     }
@@ -969,7 +966,6 @@ fun HomeScreen(
                                     is AlbumItem -> {
                                         YouTubeAlbumMenu(
                                             albumItem = item,
-                                            navController = navController,
                                             onDismiss = menuState::dismiss,
                                         )
                                     }
@@ -1000,7 +996,6 @@ fun HomeScreen(
                                     is EpisodeItem -> {
                                         YouTubeSongMenu(
                                             song = item.asSongItem(),
-                                            navController = navController,
                                             onDismiss = menuState::dismiss,
                                         )
                                     }
@@ -1230,7 +1225,7 @@ fun HomeScreen(
                                         .only(WindowInsetsSides.Horizontal)
                                         .asPaddingValues(),
                             ) {
-                                items(savedPodcastShows, key = { it.id }) { podcast ->
+                                items(savedPodcastShows.distinctBy { it.id }, key = { "home_saved_podcast_${it.id}" }) { podcast ->
                                     ytGridItem(podcast)
                                 }
                             }
@@ -1255,7 +1250,7 @@ fun HomeScreen(
                                         .only(WindowInsetsSides.Horizontal)
                                         .asPaddingValues(),
                             ) {
-                                items(episodesForLater, key = { it.id }) { episode ->
+                                items(episodesForLater.distinctBy { it.id }, key = { "home_episode_later_${it.id}" }) { episode ->
                                     ytGridItem(episode)
                                 }
                             }
@@ -1278,7 +1273,7 @@ fun HomeScreen(
                                         .only(WindowInsetsSides.Horizontal)
                                         .asPaddingValues(),
                             ) {
-                                items(featuredPodcasts, key = { it.id }) { podcast ->
+                                items(featuredPodcasts.distinctBy { it.id }, key = { "home_featured_podcast_${it.id}" }) { podcast ->
                                     ytGridItem(podcast)
                                 }
                             }
@@ -1360,7 +1355,7 @@ fun HomeScreen(
                                             .only(WindowInsetsSides.Horizontal)
                                             .asPaddingValues(),
                                 ) {
-                                    items(sectionData.items, key = { it.id }) { item ->
+                                    items(sectionData.items.distinctBy { it.id }, key = { "home_chip_section_${it.id}" }) { item ->
                                         ytGridItem(item)
                                     }
                                 }
@@ -1671,7 +1666,6 @@ fun HomeScreen(
                                                                                                 is SongItem -> {
                                                                                                     YouTubeSongMenu(
                                                                                                         song = item,
-                                                                                                        navController = navController,
                                                                                                         onDismiss = menuState::dismiss,
                                                                                                     )
                                                                                                 }
@@ -1679,7 +1673,6 @@ fun HomeScreen(
                                                                                                 is AlbumItem -> {
                                                                                                     YouTubeAlbumMenu(
                                                                                                         albumItem = item,
-                                                                                                        navController = navController,
                                                                                                         onDismiss = menuState::dismiss,
                                                                                                     )
                                                                                                 }
@@ -1710,7 +1703,6 @@ fun HomeScreen(
                                                                                                 is EpisodeItem -> {
                                                                                                     YouTubeSongMenu(
                                                                                                         song = item.asSongItem(),
-                                                                                                        navController = navController,
                                                                                                         onDismiss = menuState::dismiss,
                                                                                                     )
                                                                                                 }
@@ -1800,7 +1792,7 @@ fun HomeScreen(
                                             items(
                                                 items = quickPicks.distinctBy { it.id },
                                                 key = { "home_quickpick_${it.id}" },
-                                        ) { originalSong ->
+                                            ) { originalSong ->
                                             // fetch song from database to keep updated
                                             val song by database
                                                 .song(originalSong.id)
@@ -1818,7 +1810,6 @@ fun HomeScreen(
                                                             menuState.show {
                                                                 SongMenu(
                                                                     originalSong = song!!,
-                                                                    navController = navController,
                                                                     onDismiss = menuState::dismiss,
                                                                 )
                                                             }
@@ -1859,7 +1850,6 @@ fun HomeScreen(
                                                                 menuState.show {
                                                                     SongMenu(
                                                                         originalSong = song!!,
-                                                                        navController = navController,
                                                                         onDismiss = menuState::dismiss,
                                                                     )
                                                                 }
@@ -1975,7 +1965,6 @@ fun HomeScreen(
                                                         }
                                                     }
                                                 },
-                                                navController = navController,
                                                 modifier = Modifier.maskClip(MaterialTheme.shapes.extraLarge),
                                             )
                                         }
@@ -2016,7 +2005,7 @@ fun HomeScreen(
                                                     ) * rows,
                                                 ),
                                     ) {
-                                        items(keepListening, key = { it.id }) {
+                                        items(keepListening.distinctBy { it.id }, key = { "home_keep_listening_${it.id}" }) {
                                             localGridItem(it)
                                         }
                                     }
@@ -2125,8 +2114,8 @@ fun HomeScreen(
                                         ) {
                                             items(
                                                 items = forgottenFavorites.distinctBy { it.id },
-                                            key = { "home_forgotten_${it.id}" },
-                                        ) { originalSong ->
+                                                key = { "home_forgotten_${it.id}" },
+                                            ) { originalSong ->
                                             val song by database
                                                 .song(originalSong.id)
                                                 .collectAsStateWithLifecycle(initialValue = originalSong)
@@ -2144,7 +2133,6 @@ fun HomeScreen(
                                                             menuState.show {
                                                                 SongMenu(
                                                                     originalSong = song!!,
-                                                                    navController = navController,
                                                                     onDismiss = menuState::dismiss,
                                                                 )
                                                             }
@@ -2185,7 +2173,6 @@ fun HomeScreen(
                                                                 menuState.show {
                                                                     SongMenu(
                                                                         originalSong = song!!,
-                                                                        navController = navController,
                                                                         onDismiss = menuState::dismiss,
                                                                     )
                                                                 }
@@ -2253,7 +2240,7 @@ fun HomeScreen(
                                                 .only(WindowInsetsSides.Horizontal)
                                                 .asPaddingValues(),
                                     ) {
-                                        items(recommendation.items, key = { it.id }) { item ->
+                                        items(recommendation.items.distinctBy { it.id }, key = { "home_similar_${it.id}" }) { item ->
                                             ytGridItem(item)
                                         }
                                     }
@@ -2374,7 +2361,6 @@ fun HomeScreen(
                                                                 menuState.show {
                                                                     YouTubeSongMenu(
                                                                         song = song,
-                                                                        navController = navController,
                                                                         onDismiss = menuState::dismiss,
                                                                     )
                                                                 }
@@ -2412,7 +2398,6 @@ fun HomeScreen(
                                                                     menuState.show {
                                                                         YouTubeSongMenu(
                                                                             song = song,
-                                                                            navController = navController,
                                                                             onDismiss = menuState::dismiss,
                                                                         )
                                                                     }
@@ -2465,7 +2450,7 @@ fun HomeScreen(
                                             Modifier
                                                 .height((MoodAndGenresButtonHeight + 12.dp) * 4 + 12.dp),
                                     ) {
-                                        items(moodAndGenres, key = { it.title }) {
+                                        items(moodAndGenres.distinctBy { "${it.title}_${it.endpoint.browseId}_${it.endpoint.params}" }, key = { "${it.title}_${it.endpoint.browseId}_${it.endpoint.params}" }) {
                                             MoodAndGenresButton(
                                                 title = it.title,
                                                 onClick = {

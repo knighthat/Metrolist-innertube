@@ -59,6 +59,10 @@ import kotlin.io.encoding.ExperimentalEncodingApi
 class InnerTube {
     private var httpClient = createClient()
 
+    private companion object {
+        const val PLAYBACK_TELEMETRY_VER = "2"
+    }
+
     var locale = YouTubeLocale(
         gl = Locale.getDefault().country,
         hl = Locale.getDefault().toLanguageTag()
@@ -218,13 +222,13 @@ class InnerTube {
         continuation: String? = null,
     ) = withRetry {
         httpClient.post("search") {
-            ytClient(client, setLogin = useLoginForBrowse)
+            ytClient(client, setLogin = false)
             setBody(
                 SearchBody(
                     context = client.toContext(
                         locale,
                         visitorData,
-                        if (useLoginForBrowse) dataSyncId else null
+                        null
                     ),
                     query = query,
                     params = params
@@ -280,9 +284,9 @@ class InnerTube {
     ) = withRetry {
         httpClient.get(url) {
             ytClient(client, true)
-            parameter("ver", "2")
             parameter("c", client.clientName)
             parameter("cpn", cpn)
+            parameter("ver", PLAYBACK_TELEMETRY_VER)
 
             if (playlistId != null) {
                 parameter("list", playlistId)
