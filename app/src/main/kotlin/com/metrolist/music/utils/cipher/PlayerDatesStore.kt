@@ -2,11 +2,11 @@ package com.metrolist.music.utils.cipher
 
 import android.content.Context
 import android.util.Base64
+import co.touchlab.kermit.Logger
 import com.metrolist.innertube.YouTube
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
-import timber.log.Timber
 import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
@@ -69,7 +69,7 @@ object PlayerDatesStore {
                     dates = remote // the remote file is the single source of truth
                     runCatching { cache.writeText(body) } // persist for the next launch / offline
                 }
-            }.onFailure { Timber.tag(TAG).d("dates refresh skipped: ${it.message}") }
+            }.onFailure { Logger.withTag(TAG).d("dates refresh skipped: ${it.message}") }
         }.apply { isDaemon = true; name = "PlayerDatesRefresh" }.start()
     }
 

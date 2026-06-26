@@ -5,10 +5,10 @@ import android.webkit.ConsoleMessage
 import android.webkit.JavascriptInterface
 import android.webkit.WebChromeClient
 import android.webkit.WebView
+import co.touchlab.kermit.Logger
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
-import timber.log.Timber
 import java.io.File
 import kotlin.coroutines.Continuation
 import kotlin.coroutines.resume
@@ -48,9 +48,9 @@ class CipherWebView private constructor(
         private set
 
     init {
-        Timber.tag(TAG).d("Initializing CipherWebView...")
-        Timber.tag(TAG).d("  sigInfo: name=${sigInfo?.name}, constantArg=${sigInfo?.constantArg}, hardcoded=${sigInfo?.isHardcoded}")
-        Timber.tag(TAG).d("  nFuncInfo: name=${nFuncInfo?.name}, arrayIdx=${nFuncInfo?.arrayIndex}, hardcoded=${nFuncInfo?.isHardcoded}")
+        logger.d("Initializing CipherWebView...")
+        logger.d("  sigInfo: name=${sigInfo?.name}, constantArg=${sigInfo?.constantArg}, hardcoded=${sigInfo?.isHardcoded}")
+        logger.d("  nFuncInfo: name=${nFuncInfo?.name}, arrayIdx=${nFuncInfo?.arrayIndex}, hardcoded=${nFuncInfo?.isHardcoded}")
 
         val settings = webView.settings
         @Suppress("SetJavaScriptEnabled")
@@ -71,21 +71,21 @@ class CipherWebView private constructor(
                 when (m.messageLevel()) {
                     ConsoleMessage.MessageLevel.ERROR -> {
                         if (!msg.contains("is not defined")) {
-                            Timber.tag(TAG).e("JS ERROR: $msg at $src")
+                            logger.e("JS ERROR: $msg at $src")
                         }
                     }
                     ConsoleMessage.MessageLevel.WARNING -> {
-                        Timber.tag(TAG).w("JS WARN: $msg at $src")
+                        logger.w("JS WARN: $msg at $src")
                     }
                     else -> {
-                        Timber.tag(TAG).v("JS LOG: $msg")
+                        logger.v("JS LOG: $msg")
                     }
                 }
                 return super.onConsoleMessage(m)
             }
         }
 
-        Timber.tag(TAG).d("WebView settings configured")
+        logger.d("WebView settings configured")
     }
 
     private fun loadPlayerJsFromFile() {
@@ -94,11 +94,11 @@ class CipherWebView private constructor(
         val nArrayIdx = nFuncInfo?.arrayIndex
         val isHardcoded = sigInfo?.isHardcoded == true || nFuncInfo?.isHardcoded == true
 
-        Timber.tag(TAG).d("=== LOADING PLAYER.JS INTO WEBVIEW ===")
-        Timber.tag(TAG).d("Player.js size: ${playerJs.length} chars")
-        Timber.tag(TAG).d("Export mode: ${if (isHardcoded) "HARDCODED" else "EXTRACTED"}")
-        Timber.tag(TAG).d("Sig function: $sigFuncName (constantArg=${sigInfo?.constantArg})")
-        Timber.tag(TAG).d("N function: $nFuncName (arrayIdx=$nArrayIdx)")
+        logger.d("=== LOADING PLAYER.JS INTO WEBVIEW ===")
+        logger.d("Player.js size: ${playerJs.length} chars")
+        logger.d("Export mode: ${if (isHardcoded) "HARDCODED" else "EXTRACTED"}")
+        logger.d("Sig function: $sigFuncName (constantArg=${sigInfo?.constantArg})")
+        logger.d("N function: $nFuncName (arrayIdx=$nArrayIdx)")
 
         usingHardcodedMode = isHardcoded
 
@@ -106,7 +106,7 @@ class CipherWebView private constructor(
             val sigJsExpr = sigInfo?.jsExpression
             if (sigJsExpr != null) {
                 val expr = sigJsExpr.replace("INPUT", "sig")
-                Timber.tag(TAG).d("Sig: expression-based export: $expr")
+                logger.d("Sig: expression-based export: $expr")
                 add("window._cipherSigFunc = function(sig) { try { return $expr; } catch(e) { return null; } };")
             } else if (sigFuncName != null) {
                 val sigConstArgs = sigInfo?.constantArgs
@@ -116,15 +116,15 @@ class CipherWebView private constructor(
                 if (!sigConstArgs.isNullOrEmpty() && preprocessFunc != null && !preprocessArgs.isNullOrEmpty()) {
                     val mainArgsStr = sigConstArgs.joinToString(", ")
                     val prepArgsStr = preprocessArgs.joinToString(", ")
-                    Timber.tag(TAG).d("Sig function needs full wrapper:")
-                    Timber.tag(TAG).d("  $sigFuncName($mainArgsStr, $preprocessFunc($prepArgsStr, sig))")
+                    logger.d("Sig function needs full wrapper:")
+                    logger.d("  $sigFuncName($mainArgsStr, $preprocessFunc($prepArgsStr, sig))")
                     add("window._cipherSigFunc = function(sig) { return $sigFuncName($mainArgsStr, $preprocessFunc($prepArgsStr, sig)); };")
                 } else if (!sigConstArgs.isNullOrEmpty()) {
                     val argsStr = sigConstArgs.joinToString(", ")
-                    Timber.tag(TAG).d("Sig function needs wrapper with constant args: $argsStr")
+                    logger.d("Sig function needs wrapper with constant args: $argsStr")
                     add("window._cipherSigFunc = function(sig) { return $sigFuncName($argsStr, sig); };")
                 } else if (isHardcoded) {
-                    Timber.tag(TAG).d("Will export sig function $sigFuncName in hardcoded mode (legacy)")
+                    logger.d("Will export sig function $sigFuncName in hardcoded mode (legacy)")
                     add("window._cipherSigFunc = typeof $sigFuncName !== 'undefined' ? $sigFuncName : null;")
                 } else {
                     add("window._cipherSigFunc = typeof $sigFuncName !== 'undefined' ? $sigFuncName : null;")
@@ -133,13 +133,13 @@ class CipherWebView private constructor(
             val nJsExpr = nFuncInfo?.jsExpression
             if (nJsExpr != null) {
                 val expr = nJsExpr.replace("INPUT", "n")
-                Timber.tag(TAG).d("N: expression-based export: ${expr.take(80)}")
+                logger.d("N: expression-based export: ${expr.take(80)}")
                 add("window._nTransformFunc = function(n) { try { return $expr; } catch(e) { return n; } };")
             } else if (nFuncName != null) {
                 val nConstArgs = nFuncInfo?.constantArgs
                 if (!nConstArgs.isNullOrEmpty()) {
                     val argsStr = nConstArgs.joinToString(", ")
-                    Timber.tag(TAG).d("N-function needs wrapper with constant args: $argsStr")
+                    logger.d("N-function needs wrapper with constant args: $argsStr")
                     add("window._nTransformFunc = function(n) { return $nFuncName($argsStr, n); };")
                 } else {
                     val nExpr = if (nArrayIdx != null) {
@@ -152,23 +152,23 @@ class CipherWebView private constructor(
             }
         }
 
-        Timber.tag(TAG).d("Export statements: ${exports.size}")
+        logger.d("Export statements: ${exports.size}")
         exports.forEachIndexed { idx, stmt ->
-            Timber.tag(TAG).v("  Export[$idx]: ${stmt.take(80)}...")
+            logger.v("  Export[$idx]: ${stmt.take(80)}...")
         }
 
         val modifiedJs = if (exports.isNotEmpty()) {
             val exportCode = "; " + exports.joinToString(" ")
             val modified = playerJs.replace("})(_yt_player);", "$exportCode })(_yt_player);")
             if (modified == playerJs) {
-                Timber.tag(TAG).w("Export injection point '})(_yt_player);' not found, appending exports")
+                logger.w("Export injection point '})(_yt_player);' not found, appending exports")
                 playerJs + "\n" + exportCode
             } else {
-                Timber.tag(TAG).d("Exports injected into IIFE closure")
+                logger.d("Exports injected into IIFE closure")
                 modified
             }
         } else {
-            Timber.tag(TAG).w("No exports to inject")
+            logger.w("No exports to inject")
             playerJs
         }
 
@@ -176,17 +176,17 @@ class CipherWebView private constructor(
         cacheDir.mkdirs()
         val playerJsFile = File(cacheDir, "player.js")
         playerJsFile.writeText(modifiedJs)
-        Timber.tag(TAG).d("Player.js written to cache: ${playerJsFile.absolutePath} (${modifiedJs.length} chars)")
+        logger.d("Player.js written to cache: ${playerJsFile.absolutePath} (${modifiedJs.length} chars)")
 
         // Build HTML with comprehensive discovery and validation
         val html = buildDiscoveryHtml()
-        Timber.tag(TAG).d("Discovery HTML built (${html.length} chars)")
+        logger.d("Discovery HTML built (${html.length} chars)")
 
         webView.loadDataWithBaseURL(
             "file://${cacheDir.absolutePath}/",
             html, "text/html", "utf-8", null
         )
-        Timber.tag(TAG).d("WebView loading started...")
+        logger.d("WebView loading started...")
     }
 
     /**
@@ -408,23 +408,23 @@ function discoverAndInit() {
 
     @JavascriptInterface
     fun logDebug(message: String) {
-        Timber.tag(TAG).d("JS: $message")
+        logger.d("JS: $message")
     }
 
     @JavascriptInterface
     fun onDiscoveryDone(sigFuncName: String, nFuncName: String, info: String) {
-        Timber.tag(TAG).d("=== DISCOVERY COMPLETE ===")
-        Timber.tag(TAG).d("Sig function: ${sigFuncName.ifEmpty { "NOT FOUND" }}")
-        Timber.tag(TAG).d("N function: ${nFuncName.ifEmpty { "NOT FOUND" }}")
-        Timber.tag(TAG).d("Info: $info")
+        logger.d("=== DISCOVERY COMPLETE ===")
+        logger.d("Sig function: ${sigFuncName.ifEmpty { "NOT FOUND" }}")
+        logger.d("N function: ${nFuncName.ifEmpty { "NOT FOUND" }}")
+        logger.d("Info: $info")
 
         sigFunctionAvailable = sigFuncName.isNotEmpty()
         if (nFuncName.isNotEmpty()) {
             discoveredNFuncName = nFuncName
             nFunctionAvailable = true
-            Timber.tag(TAG).d("N-function AVAILABLE: $nFuncName")
+            logger.d("N-function AVAILABLE: $nFuncName")
         } else {
-            Timber.tag(TAG).e("N-function NOT AVAILABLE")
+            logger.e("N-function NOT AVAILABLE")
             nFunctionAvailable = false
         }
     }
@@ -432,7 +432,7 @@ function discoverAndInit() {
     @JavascriptInterface
     fun onNDiscoveryDone(funcName: String, info: String) {
         // Legacy interface - redirects to new combined discovery
-        Timber.tag(TAG).d("Legacy onNDiscoveryDone: funcName=$funcName, info=$info")
+        logger.d("Legacy onNDiscoveryDone: funcName=$funcName, info=$info")
         if (funcName.isNotEmpty()) {
             discoveredNFuncName = funcName
             nFunctionAvailable = true
@@ -441,32 +441,32 @@ function discoverAndInit() {
 
     @JavascriptInterface
     fun onPlayerJsLoaded() {
-        Timber.tag(TAG).d("=== PLAYER.JS LOAD COMPLETE ===")
-        Timber.tag(TAG).d("sigFunctionAvailable=$sigFunctionAvailable")
-        Timber.tag(TAG).d("nFunctionAvailable=$nFunctionAvailable")
-        Timber.tag(TAG).d("discoveredNFuncName=$discoveredNFuncName")
-        Timber.tag(TAG).d("usingHardcodedMode=$usingHardcodedMode")
+        logger.d("=== PLAYER.JS LOAD COMPLETE ===")
+        logger.d("sigFunctionAvailable=$sigFunctionAvailable")
+        logger.d("nFunctionAvailable=$nFunctionAvailable")
+        logger.d("discoveredNFuncName=$discoveredNFuncName")
+        logger.d("usingHardcodedMode=$usingHardcodedMode")
 
         initContinuation.resume(this)
     }
 
     @JavascriptInterface
     fun onPlayerJsError(error: String) {
-        Timber.tag(TAG).e("=== PLAYER.JS LOAD FAILED ===")
-        Timber.tag(TAG).e("Error: $error")
+        logger.e("=== PLAYER.JS LOAD FAILED ===")
+        logger.e("Error: $error")
         initContinuation.resumeWithException(CipherException("Player JS load failed: $error"))
     }
 
     // ==================== SIGNATURE DEOBFUSCATION ====================
 
     suspend fun deobfuscateSignature(obfuscatedSig: String): String {
-        Timber.tag(TAG).d("========== DEOBFUSCATE SIGNATURE ==========")
-        Timber.tag(TAG).d("Input sig length: ${obfuscatedSig.length}")
-        Timber.tag(TAG).d("Input sig preview: ${obfuscatedSig.take(50)}...")
-        Timber.tag(TAG).d("sigInfo: name=${sigInfo?.name}, constantArg=${sigInfo?.constantArg}")
+        logger.d("========== DEOBFUSCATE SIGNATURE ==========")
+        logger.d("Input sig length: ${obfuscatedSig.length}")
+        logger.d("Input sig preview: ${obfuscatedSig.take(50)}...")
+        logger.d("sigInfo: name=${sigInfo?.name}, constantArg=${sigInfo?.constantArg}")
 
         if (sigInfo == null) {
-            Timber.tag(TAG).e("Signature function info not available")
+            logger.e("Signature function info not available")
             throw CipherException("Signature function info not available")
         }
 
@@ -475,7 +475,7 @@ function discoverAndInit() {
                 sigContinuation = cont
                 val constArgJs = if (sigInfo.constantArg != null) "${sigInfo.constantArg}" else "null"
                 val jsCall = "deobfuscateSig('${sigInfo.name}', $constArgJs, '${escapeJsString(obfuscatedSig)}')"
-                Timber.tag(TAG).d("Evaluating JS: ${jsCall.take(100)}...")
+                logger.d("Evaluating JS: ${jsCall.take(100)}...")
                 webView.evaluateJavascript(jsCall, null)
             }
         }
@@ -483,17 +483,17 @@ function discoverAndInit() {
 
     @JavascriptInterface
     fun onSigResult(result: String) {
-        Timber.tag(TAG).d("========== SIGNATURE RESULT ==========")
-        Timber.tag(TAG).d("Result length: ${result.length}")
-        Timber.tag(TAG).d("Result preview: ${result.take(50)}...")
+        logger.d("========== SIGNATURE RESULT ==========")
+        logger.d("Result length: ${result.length}")
+        logger.d("Result preview: ${result.take(50)}...")
         sigContinuation?.resume(result)
         sigContinuation = null
     }
 
     @JavascriptInterface
     fun onSigError(error: String) {
-        Timber.tag(TAG).e("========== SIGNATURE ERROR ==========")
-        Timber.tag(TAG).e("Error: $error")
+        logger.e("========== SIGNATURE ERROR ==========")
+        logger.e("Error: $error")
         sigContinuation?.resumeWithException(CipherException("Sig deobfuscation failed: $error"))
         sigContinuation = null
     }
@@ -501,13 +501,13 @@ function discoverAndInit() {
     // ==================== N-TRANSFORM ====================
 
     suspend fun transformN(nValue: String): String {
-        Timber.tag(TAG).d("========== N-TRANSFORM ==========")
-        Timber.tag(TAG).d("Input n value: $nValue")
-        Timber.tag(TAG).d("nFunctionAvailable: $nFunctionAvailable")
-        Timber.tag(TAG).d("discoveredNFuncName: $discoveredNFuncName")
+        logger.d("========== N-TRANSFORM ==========")
+        logger.d("Input n value: $nValue")
+        logger.d("nFunctionAvailable: $nFunctionAvailable")
+        logger.d("discoveredNFuncName: $discoveredNFuncName")
 
         if (!nFunctionAvailable) {
-            Timber.tag(TAG).e("N-transform function not discovered")
+            logger.e("N-transform function not discovered")
             throw CipherException("N-transform function not discovered")
         }
 
@@ -515,7 +515,7 @@ function discoverAndInit() {
             suspendCancellableCoroutine { cont ->
                 nContinuation = cont
                 val jsCall = "transformN('${escapeJsString(nValue)}')"
-                Timber.tag(TAG).d("Evaluating JS: $jsCall")
+                logger.d("Evaluating JS: $jsCall")
                 webView.evaluateJavascript(jsCall, null)
             }
         }
@@ -523,17 +523,17 @@ function discoverAndInit() {
 
     @JavascriptInterface
     fun onNResult(result: String) {
-        Timber.tag(TAG).d("========== N-TRANSFORM RESULT ==========")
-        Timber.tag(TAG).d("Result: $result")
-        Timber.tag(TAG).d("Result length: ${result.length}")
+        logger.d("========== N-TRANSFORM RESULT ==========")
+        logger.d("Result: $result")
+        logger.d("Result length: ${result.length}")
         nContinuation?.resume(result)
         nContinuation = null
     }
 
     @JavascriptInterface
     fun onNError(error: String) {
-        Timber.tag(TAG).e("========== N-TRANSFORM ERROR ==========")
-        Timber.tag(TAG).e("Error: $error")
+        logger.e("========== N-TRANSFORM ERROR ==========")
+        logger.e("Error: $error")
         nContinuation?.resumeWithException(CipherException("N-transform failed: $error"))
         nContinuation = null
     }
@@ -541,14 +541,14 @@ function discoverAndInit() {
     // ==================== CLEANUP ====================
 
     fun close() {
-        Timber.tag(TAG).d("Closing CipherWebView...")
+        logger.d("Closing CipherWebView...")
         webView.clearHistory()
         webView.clearCache(true)
         webView.loadUrl("about:blank")
         webView.onPause()
         webView.removeAllViews()
         webView.destroy()
-        Timber.tag(TAG).d("CipherWebView closed")
+        logger.d("CipherWebView closed")
     }
 
     // ==================== UTILITIES ====================
@@ -566,16 +566,18 @@ function discoverAndInit() {
         private const val TAG = "Metrolist_CipherWebView"
         private const val JS_INTERFACE = "CipherBridge"
 
+        private val logger = Logger.withTag(TAG)
+
         suspend fun create(
             context: Context,
             playerJs: String,
             sigInfo: FunctionNameExtractor.SigFunctionInfo?,
             nFuncInfo: FunctionNameExtractor.NFunctionInfo? = null,
         ): CipherWebView {
-            Timber.tag(TAG).d("=== CREATING CIPHER WEBVIEW ===")
-            Timber.tag(TAG).d("playerJs size: ${playerJs.length} chars")
-            Timber.tag(TAG).d("sigInfo: $sigInfo")
-            Timber.tag(TAG).d("nFuncInfo: $nFuncInfo")
+            logger.d("=== CREATING CIPHER WEBVIEW ===")
+            logger.d("playerJs size: ${playerJs.length} chars")
+            logger.d("sigInfo: $sigInfo")
+            logger.d("nFuncInfo: $nFuncInfo")
 
             return withContext(Dispatchers.Main) {
                 suspendCancellableCoroutine { cont ->

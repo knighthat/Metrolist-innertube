@@ -2,6 +2,7 @@ package com.metrolist.music.utils.cipher
 
 import android.content.Context
 import android.util.Base64
+import co.touchlab.kermit.Logger
 import com.metrolist.innertube.YouTube
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -12,7 +13,6 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
-import timber.log.Timber
 import java.io.File
 import java.nio.charset.StandardCharsets
 
@@ -29,6 +29,7 @@ object PlayerConfigStore {
     private const val TAG = "Metrolist_CipherConfig"
     private const val ASSET_NAME = "player_configs.json"
 
+    private val logger = Logger.withTag(TAG)
     private val REMOTE_URL by lazy {
         val encoded = "aHR0cHM6Ly9yYXcuZ2l0aHVidXNlcmNvbnRlbnQuY29tL01ldHJvbGlzdEdyb3VwL01ldHJvbGlzdC9tYWluL2FwcC9zcmMvbWFpbi9hc3NldHMvcGxheWVyX2NvbmZpZ3MuanNvbg=="
         String(Base64.decode(encoded, Base64.DEFAULT), StandardCharsets.UTF_8)
@@ -116,9 +117,9 @@ object PlayerConfigStore {
             else -> result
         }
         if (bundledConfigs.isEmpty()) {
-            Timber.tag(TAG).e("Bundled $ASSET_NAME missing or invalid — config table starts empty")
+            logger.e("Bundled $ASSET_NAME missing or invalid — config table starts empty")
         } else {
-            Timber.tag(TAG).d("Loaded bundled configs (${bundledConfigs.size} hashes)")
+            logger.d("Loaded bundled configs (${bundledConfigs.size} hashes)")
         }
 
         applyCachedOverlay()
@@ -134,7 +135,7 @@ object PlayerConfigStore {
     internal fun applyCachedOverlay() {
         val cached = parseSource("cached remote copy") { cacheFile()?.takeIf { it.exists() }?.readText() }
         mergedConfigs = if (cached != null) {
-            Timber.tag(TAG).d("Overlaying cached remote configs (${cached.size} hashes)")
+            logger.d("Overlaying cached remote configs (${cached.size} hashes)")
             PlayerConfigParser.merge(bundledConfigs, cached)
         } else {
             cacheFile()?.delete()
@@ -149,7 +150,7 @@ object PlayerConfigStore {
             try {
                 refreshIfStale()
             } catch (e: Exception) {
-                Timber.tag(TAG).w(e, "Startup config refresh failed: ${e.message}")
+                logger.w("Startup config refresh failed: ${e.message}", e)
             }
         }
     }
@@ -157,7 +158,7 @@ object PlayerConfigStore {
     fun get(hash: String): FunctionNameExtractor.HardcodedPlayerConfig? {
         val configs = mergedConfigs
         if (configs.isEmpty()) {
-            Timber.tag(TAG).w("Config table is empty (initialize not called or bundled asset broken)")
+            logger.w("Config table is empty (initialize not called or bundled asset broken)")
         }
         return configs[hash]
     }
@@ -181,13 +182,13 @@ object PlayerConfigStore {
             // A refresh that held the lock while we waited (startup TTL, another miss) may
             // have just landed this config — don't burn a fetch or arm the cooldown.
             if (mergedConfigs.containsKey(missingHash)) {
-                Timber.tag(TAG).d("forceRefresh: $missingHash arrived via concurrent refresh")
+                logger.d("forceRefresh: $missingHash arrived via concurrent refresh")
                 return@withLock true
             }
 
             val now = System.currentTimeMillis()
             if (forcedCooldownActive(now)) {
-                Timber.tag(TAG).d("forceRefresh skipped (cooldown)")
+                logger.d("forceRefresh skipped (cooldown)")
                 return@withLock false
             }
             lastForcedAttemptMs = now
@@ -209,7 +210,7 @@ object PlayerConfigStore {
         refreshMutex.withLock {
             val now = System.currentTimeMillis()
             if (rejectionCooldownActive(now)) {
-                Timber.tag(TAG).d("refreshAfterStreamRejection skipped (cooldown)")
+                logger.d("refreshAfterStreamRejection skipped (cooldown)")
                 return@withLock false
             }
             lastRejectionAttemptMs = now
@@ -232,7 +233,7 @@ object PlayerConfigStore {
     private suspend fun refreshIfStale() {
         val lastFetchMs = readMeta()?.second ?: 0L
         if (System.currentTimeMillis() - lastFetchMs < REFRESH_TTL_MS) {
-            Timber.tag(TAG).d("Remote configs fresh (fetched ${System.currentTimeMillis() - lastFetchMs} ms ago)")
+            logger.d("Remote configs fresh (fetched ${System.currentTimeMillis() - lastFetchMs} ms ago)")
             return
         }
         withContext(Dispatchers.IO) {
@@ -259,29 +260,29 @@ object PlayerConfigStore {
             httpClient.newCall(request).execute().use { response ->
                 lastAttemptReachedServer = true
                 if (response.code == 304) {
-                    Timber.tag(TAG).d("Remote configs unchanged (304)")
+                    logger.d("Remote configs unchanged (304)")
                     writeMeta(etag.orEmpty(), System.currentTimeMillis())
                     return false
                 }
                 if (!response.isSuccessful) {
-                    Timber.tag(TAG).w("Remote config fetch HTTP ${response.code} — keeping previous configs")
+                    logger.w("Remote config fetch HTTP ${response.code} — keeping previous configs")
                     return false
                 }
 
                 val body = response.body?.string()
                 if (body.isNullOrEmpty()) {
-                    Timber.tag(TAG).w("Remote config fetch returned empty body — keeping previous configs")
+                    logger.w("Remote config fetch returned empty body — keeping previous configs")
                     return false
                 }
 
                 val remote = when (val result = PlayerConfigParser.parse(body)) {
                     is PlayerConfigParser.ParseResult.Failure -> {
-                        Timber.tag(TAG).w("Remote configs rejected: ${result.reason} — keeping previous configs")
+                        logger.w("Remote configs rejected: ${result.reason} — keeping previous configs")
                         return false
                     }
                     is PlayerConfigParser.ParseResult.Success -> {
                         if (result.skippedEntries.isNotEmpty()) {
-                            Timber.tag(TAG).w("Remote configs: skipped invalid entries ${result.skippedEntries}")
+                            logger.w("Remote configs: skipped invalid entries ${result.skippedEntries}")
                         }
                         result.configs
                     }
@@ -290,7 +291,7 @@ object PlayerConfigStore {
                 return applyRemote(remote, body, response.header("ETag").orEmpty())
             }
         } catch (e: Exception) {
-            Timber.tag(TAG).w(e, "Remote config fetch failed: ${e.message} — keeping previous configs")
+            logger.w("Remote config fetch failed: ${e.message} — keeping previous configs", e)
             return false
         }
     }
@@ -310,13 +311,13 @@ object PlayerConfigStore {
         val changed = merged != mergedConfigs
         mergedConfigs = merged
         if (changed) configEpoch++
-        Timber.tag(TAG).d("Remote configs applied (${remote.size} hashes, merged=${merged.size}, changed=$changed, epoch=$configEpoch)")
+        logger.d("Remote configs applied (${remote.size} hashes, merged=${merged.size}, changed=$changed, epoch=$configEpoch)")
 
         try {
             cacheFile()?.let { writeAtomic(it, body) }
             writeMeta(etag, System.currentTimeMillis())
         } catch (e: Exception) {
-            Timber.tag(TAG).w(e, "Could not persist remote configs (kept in memory): ${e.message}")
+            logger.w("Could not persist remote configs (kept in memory): ${e.message}", e)
         }
         return changed
     }
@@ -328,17 +329,17 @@ object PlayerConfigStore {
         val text = try {
             read() ?: return null
         } catch (e: Exception) {
-            Timber.tag(TAG).w(e, "Could not read $label: ${e.message}")
+            logger.w("Could not read $label: ${e.message}", e)
             return null
         }
         return when (val result = PlayerConfigParser.parse(text)) {
             is PlayerConfigParser.ParseResult.Failure -> {
-                Timber.tag(TAG).w("Rejected $label: ${result.reason}")
+                logger.w("Rejected $label: ${result.reason}")
                 null
             }
             is PlayerConfigParser.ParseResult.Success -> {
                 if (result.skippedEntries.isNotEmpty()) {
-                    Timber.tag(TAG).w("$label: skipped invalid entries ${result.skippedEntries}")
+                    logger.w("$label: skipped invalid entries ${result.skippedEntries}")
                 }
                 result.configs
             }
@@ -378,7 +379,7 @@ object PlayerConfigStore {
         try {
             metaFile()?.let { writeAtomic(it, "$etag\n$lastFetchMs") }
         } catch (e: Exception) {
-            Timber.tag(TAG).w(e, "Could not write config meta: ${e.message}")
+            logger.w("Could not write config meta: ${e.message}", e)
         }
     }
 

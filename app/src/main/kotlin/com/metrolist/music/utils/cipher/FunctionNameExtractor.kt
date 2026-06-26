@@ -1,6 +1,6 @@
 package com.metrolist.music.utils.cipher
 
-import timber.log.Timber
+import co.touchlab.kermit.Logger
 import java.security.MessageDigest
 
 /**
@@ -11,6 +11,8 @@ import java.security.MessageDigest
  */
 object FunctionNameExtractor {
     private const val TAG = "Metrolist_CipherFnExtract"
+
+    private val logger = Logger.withTag(TAG)
 
     // ==================== DATA CLASSES ====================
 
@@ -97,7 +99,7 @@ object FunctionNameExtractor {
      */
     fun hasQArrayObfuscation(playerJs: String): Boolean {
         val hasQArray = Q_ARRAY_PATTERN.containsMatchIn(playerJs)
-        Timber.tag(TAG).d("Q-array obfuscation check: hasQArray=$hasQArray")
+        logger.d("Q-array obfuscation check: hasQArray=$hasQArray")
 
         if (hasQArray) {
             // Try to count Q array elements for additional info
@@ -108,7 +110,7 @@ object FunctionNameExtractor {
                 if (qDefEnd > start) {
                     val qDef = playerJs.substring(start, qDefEnd)
                     val elementCount = qDef.count { it == '}' } + 1
-                    Timber.tag(TAG).d("Q-array detected with ~$elementCount elements")
+                    logger.d("Q-array detected with ~$elementCount elements")
                 }
             }
         }
@@ -119,14 +121,14 @@ object FunctionNameExtractor {
      * Extract player.js hash from embedded URLs or compute from content
      */
     fun extractPlayerHash(playerJs: String): String? {
-        Timber.tag(TAG).d("Extracting player hash from playerJs (${playerJs.length} chars)")
+        logger.d("Extracting player hash from playerJs (${playerJs.length} chars)")
 
         // Try to extract from embedded URLs first
         for ((index, pattern) in PLAYER_HASH_PATTERNS.withIndex()) {
             val match = pattern.find(playerJs)
             if (match != null) {
                 val hash = match.groupValues[1]
-                Timber.tag(TAG).d("Player hash found via pattern $index: $hash")
+                logger.d("Player hash found via pattern $index: $hash")
                 return hash
             }
         }
@@ -136,7 +138,7 @@ object FunctionNameExtractor {
         val md = MessageDigest.getInstance("MD5")
         val digest = md.digest(contentToHash.toByteArray())
         val computedHash = digest.take(4).joinToString("") { "%02x".format(it) }
-        Timber.tag(TAG).d("Player hash computed from content: $computedHash")
+        logger.d("Player hash computed from content: $computedHash")
         return computedHash
     }
 
@@ -148,14 +150,14 @@ object FunctionNameExtractor {
     fun getHardcodedConfig(playerHash: String): HardcodedPlayerConfig? {
         val config = PlayerConfigStore.get(playerHash)
         if (config != null) {
-            Timber.tag(TAG).d("Found config for hash $playerHash:")
-            Timber.tag(TAG).d("  sigFunc=${config.sigFuncName}(${config.sigConstantArg}, ...)")
-            Timber.tag(TAG).d("  sigExpr=${config.sigJsExpression}")
-            Timber.tag(TAG).d("  nFunc=${config.nFuncName}[${config.nArrayIndex}]")
-            Timber.tag(TAG).d("  signatureTimestamp=${config.signatureTimestamp}")
+            logger.d("Found config for hash $playerHash:")
+            logger.d("  sigFunc=${config.sigFuncName}(${config.sigConstantArg}, ...)")
+            logger.d("  sigExpr=${config.sigJsExpression}")
+            logger.d("  nFunc=${config.nFuncName}[${config.nArrayIndex}]")
+            logger.d("  signatureTimestamp=${config.signatureTimestamp}")
         } else {
-            Timber.tag(TAG).w("No config for hash: $playerHash")
-            Timber.tag(TAG).w("Known hashes: ${PlayerConfigStore.knownHashes().sorted().joinToString()}")
+            logger.w("No config for hash: $playerHash")
+            logger.w("Known hashes: ${PlayerConfigStore.knownHashes().sorted().joinToString()}")
         }
         return config
     }
@@ -172,20 +174,20 @@ object FunctionNameExtractor {
      * @param knownHash Optional hash for config lookup
      */
     fun extractSigFunctionInfo(playerJs: String, knownHash: String? = null): SigFunctionInfo? {
-        Timber.tag(TAG).d("========== EXTRACTING SIG FUNCTION ==========")
-        Timber.tag(TAG).d("Player.js size: ${playerJs.length} chars")
+        logger.d("========== EXTRACTING SIG FUNCTION ==========")
+        logger.d("Player.js size: ${playerJs.length} chars")
 
         // Validated config first.
         val hashToUse = knownHash ?: extractPlayerHash(playerJs)
-        Timber.tag(TAG).d("Using hash for config lookup: $hashToUse (knownHash=$knownHash)")
+        logger.d("Using hash for config lookup: $hashToUse (knownHash=$knownHash)")
         if (hashToUse != null) {
             val config = getHardcodedConfig(hashToUse)
             if (config != null) {
                 if (config.sigJsExpression != null) {
-                    Timber.tag(TAG).d("USING EXPRESSION-BASED SIG: ${config.sigJsExpression}")
+                    logger.d("USING EXPRESSION-BASED SIG: ${config.sigJsExpression}")
                 } else {
-                    Timber.tag(TAG).d("USING HARDCODED SIG FUNCTION: ${config.sigFuncName}(${config.sigConstantArgs}, ...)")
-                    Timber.tag(TAG).d("Sig preprocess: ${config.sigPreprocessFunc}(${config.sigPreprocessArgs}, sig)")
+                    logger.d("USING HARDCODED SIG FUNCTION: ${config.sigFuncName}(${config.sigConstantArgs}, ...)")
+                    logger.d("Sig preprocess: ${config.sigPreprocessFunc}(${config.sigPreprocessArgs}, sig)")
                 }
                 return SigFunctionInfo(
                     name = config.sigFuncName,
@@ -199,23 +201,23 @@ object FunctionNameExtractor {
             }
         }
 
-        Timber.tag(TAG).w("No config for hash $hashToUse, trying legacy sig patterns...")
+        logger.w("No config for hash $hashToUse, trying legacy sig patterns...")
 
         for ((index, pattern) in SIG_FUNCTION_PATTERNS.withIndex()) {
-            Timber.tag(TAG).v("Trying sig pattern $index: ${pattern.pattern.take(60)}...")
+            logger.v("Trying sig pattern $index: ${pattern.pattern.take(60)}...")
             val match = pattern.find(playerJs)
             if (match != null) {
                 val name = match.groupValues[1]
                 val constArg = if (match.groupValues.size > 2) match.groupValues[2].toIntOrNull() else null
-                Timber.tag(TAG).d("SIG FUNCTION FOUND via pattern $index:")
-                Timber.tag(TAG).d("  name=$name, constantArg=$constArg")
-                Timber.tag(TAG).d("  match context: ...${playerJs.substring(maxOf(0, match.range.first - 20), minOf(playerJs.length, match.range.last + 20))}...")
+                logger.d("SIG FUNCTION FOUND via pattern $index:")
+                logger.d("  name=$name, constantArg=$constArg")
+                logger.d("  match context: ...${playerJs.substring(maxOf(0, match.range.first - 20), minOf(playerJs.length, match.range.last + 20))}...")
                 return SigFunctionInfo(name, constArg, isHardcoded = false)
             }
         }
 
-        Timber.tag(TAG).e("========== SIG FUNCTION EXTRACTION FAILED ==========")
-        Timber.tag(TAG).e("Could not find signature deobfuscation function name")
+        logger.e("========== SIG FUNCTION EXTRACTION FAILED ==========")
+        logger.e("Could not find signature deobfuscation function name")
         return null
     }
 
@@ -228,44 +230,44 @@ object FunctionNameExtractor {
      * @param knownHash Optional hash for config lookup
      */
     fun extractNFunctionInfo(playerJs: String, knownHash: String? = null): NFunctionInfo? {
-        Timber.tag(TAG).d("========== EXTRACTING N-FUNCTION ==========")
-        Timber.tag(TAG).d("Player.js size: ${playerJs.length} chars")
+        logger.d("========== EXTRACTING N-FUNCTION ==========")
+        logger.d("Player.js size: ${playerJs.length} chars")
 
         // Validated config first.
         val hashToUse = knownHash ?: extractPlayerHash(playerJs)
-        Timber.tag(TAG).d("Using hash for config lookup: $hashToUse (knownHash=$knownHash)")
+        logger.d("Using hash for config lookup: $hashToUse (knownHash=$knownHash)")
         if (hashToUse != null) {
             val config = getHardcodedConfig(hashToUse)
             if (config != null) {
                 if (config.nJsExpression != null) {
-                    Timber.tag(TAG).d("USING EXPRESSION-BASED N-FUNCTION: ${config.nJsExpression.take(60)}")
+                    logger.d("USING EXPRESSION-BASED N-FUNCTION: ${config.nJsExpression.take(60)}")
                 } else {
-                    Timber.tag(TAG).d("USING HARDCODED N-FUNCTION: ${config.nFuncName}[${config.nArrayIndex}]")
-                    Timber.tag(TAG).d("N-function constant args: ${config.nConstantArgs}")
+                    logger.d("USING HARDCODED N-FUNCTION: ${config.nFuncName}[${config.nArrayIndex}]")
+                    logger.d("N-function constant args: ${config.nConstantArgs}")
                 }
                 return NFunctionInfo(config.nFuncName, config.nArrayIndex, config.nConstantArgs, config.nJsExpression, isHardcoded = true)
             }
         }
 
-        Timber.tag(TAG).w("No config for hash $hashToUse, trying legacy n-func patterns...")
+        logger.w("No config for hash $hashToUse, trying legacy n-func patterns...")
 
         for ((index, pattern) in N_FUNCTION_PATTERNS.withIndex()) {
-            Timber.tag(TAG).v("Trying n-func pattern $index: ${pattern.pattern.take(60)}...")
+            logger.v("Trying n-func pattern $index: ${pattern.pattern.take(60)}...")
             val match = pattern.find(playerJs)
             if (match != null) {
                 when (index) {
                     0 -> {
                         val name = match.groupValues[1]
                         val arrayIdx = match.groupValues[2].toIntOrNull()
-                        Timber.tag(TAG).d("N-FUNCTION FOUND via pattern $index:")
-                        Timber.tag(TAG).d("  name=$name, arrayIndex=$arrayIdx")
+                        logger.d("N-FUNCTION FOUND via pattern $index:")
+                        logger.d("  name=$name, arrayIndex=$arrayIdx")
                         return NFunctionInfo(name, arrayIdx, isHardcoded = false)
                     }
                     1 -> {
                         val name = match.groupValues[2]
                         val arrayIdx = match.groupValues[3].toIntOrNull()
-                        Timber.tag(TAG).d("N-FUNCTION FOUND via pattern $index:")
-                        Timber.tag(TAG).d("  name=$name, arrayIndex=$arrayIdx")
+                        logger.d("N-FUNCTION FOUND via pattern $index:")
+                        logger.d("  name=$name, arrayIndex=$arrayIdx")
                         return NFunctionInfo(name, arrayIdx, isHardcoded = false)
                     }
                     else -> {
@@ -273,20 +275,20 @@ object FunctionNameExtractor {
                         // E.g. the `.get("n");if(...){var M=n.match...` April 2026 variant has
                         // no capturing groups and reading groupValues[1] would throw.
                         if (pattern.toPattern().matcher("").groupCount() < 1) {
-                            Timber.tag(TAG).d("N-pattern $index matched but has no capture groups; skipping")
+                            logger.d("N-pattern $index matched but has no capture groups; skipping")
                             continue
                         }
                         val name = match.groupValues[1]
-                        Timber.tag(TAG).d("N-FUNCTION FOUND via pattern $index:")
-                        Timber.tag(TAG).d("  name=$name")
+                        logger.d("N-FUNCTION FOUND via pattern $index:")
+                        logger.d("  name=$name")
                         return NFunctionInfo(name, null, isHardcoded = false)
                     }
                 }
             }
         }
 
-        Timber.tag(TAG).e("========== N-FUNCTION EXTRACTION FAILED ==========")
-        Timber.tag(TAG).e("Could not find n-transform function name")
+        logger.e("========== N-FUNCTION EXTRACTION FAILED ==========")
+        logger.e("Could not find n-transform function name")
         return null
     }
 
@@ -294,7 +296,7 @@ object FunctionNameExtractor {
      * Extract signatureTimestamp from player.js
      */
     fun extractSignatureTimestamp(playerJs: String): Int? {
-        Timber.tag(TAG).d("Extracting signatureTimestamp...")
+        logger.d("Extracting signatureTimestamp...")
 
         val patterns = listOf(
             Regex("""signatureTimestamp['":\s]+(\d+)"""),
@@ -307,7 +309,7 @@ object FunctionNameExtractor {
             if (match != null) {
                 val sts = match.groupValues[1].toIntOrNull()
                 if (sts != null) {
-                    Timber.tag(TAG).d("signatureTimestamp found via pattern $index: $sts")
+                    logger.d("signatureTimestamp found via pattern $index: $sts")
                     return sts
                 }
             }
@@ -318,12 +320,12 @@ object FunctionNameExtractor {
         if (playerHash != null) {
             val config = getHardcodedConfig(playerHash)
             if (config != null) {
-                Timber.tag(TAG).d("Using hardcoded signatureTimestamp: ${config.signatureTimestamp}")
+                logger.d("Using hardcoded signatureTimestamp: ${config.signatureTimestamp}")
                 return config.signatureTimestamp
             }
         }
 
-        Timber.tag(TAG).w("Could not extract signatureTimestamp")
+        logger.w("Could not extract signatureTimestamp")
         return null
     }
 
@@ -333,11 +335,11 @@ object FunctionNameExtractor {
      * @param knownHash Optional hash from PlayerJsFetcher (preferred over computed)
      */
     fun analyzePlayerJs(playerJs: String, knownHash: String? = null): PlayerAnalysis {
-        Timber.tag(TAG).d("=== PLAYER.JS CIPHER ANALYSIS ===")
+        logger.d("=== PLAYER.JS CIPHER ANALYSIS ===")
 
         // Use knownHash from PlayerJsFetcher if provided, otherwise extract/compute
         val playerHash = if (knownHash != null) {
-            Timber.tag(TAG).d("Using known hash from PlayerJsFetcher: $knownHash")
+            logger.d("Using known hash from PlayerJsFetcher: $knownHash")
             knownHash
         } else {
             extractPlayerHash(playerJs)
@@ -348,14 +350,14 @@ object FunctionNameExtractor {
         val nFuncInfo = extractNFunctionInfo(playerJs, playerHash)
         val signatureTimestamp = extractSignatureTimestamp(playerJs)
 
-        Timber.tag(TAG).d("=== ANALYSIS SUMMARY ===")
-        Timber.tag(TAG).d("Player Hash:        ${playerHash ?: "unknown"}")
-        Timber.tag(TAG).d("Q-Array Obfuscated: $hasQArray")
-        Timber.tag(TAG).d("Sig Function:       ${sigInfo?.name ?: "NOT FOUND"} (hardcoded=${sigInfo?.isHardcoded})")
-        Timber.tag(TAG).d("Sig Constant Arg:   ${sigInfo?.constantArg}")
-        Timber.tag(TAG).d("N-Function:         ${nFuncInfo?.name ?: "NOT FOUND"} (hardcoded=${nFuncInfo?.isHardcoded})")
-        Timber.tag(TAG).d("N-Array Index:      ${nFuncInfo?.arrayIndex}")
-        Timber.tag(TAG).d("Signature TS:       $signatureTimestamp")
+        logger.d("=== ANALYSIS SUMMARY ===")
+        logger.d("Player Hash:        ${playerHash ?: "unknown"}")
+        logger.d("Q-Array Obfuscated: $hasQArray")
+        logger.d("Sig Function:       ${sigInfo?.name ?: "NOT FOUND"} (hardcoded=${sigInfo?.isHardcoded})")
+        logger.d("Sig Constant Arg:   ${sigInfo?.constantArg}")
+        logger.d("N-Function:         ${nFuncInfo?.name ?: "NOT FOUND"} (hardcoded=${nFuncInfo?.isHardcoded})")
+        logger.d("N-Array Index:      ${nFuncInfo?.arrayIndex}")
+        logger.d("Signature TS:       $signatureTimestamp")
 
         return PlayerAnalysis(
             playerHash = playerHash,
