@@ -24,6 +24,8 @@ object CipherDeobfuscator {
     lateinit var appContext: Context
         private set
 
+    fun isInitialized(): Boolean = ::appContext.isInitialized
+
     fun initialize(context: Context) {
         logger.d("CipherDeobfuscator initializing...")
         appContext = context.applicationContext
