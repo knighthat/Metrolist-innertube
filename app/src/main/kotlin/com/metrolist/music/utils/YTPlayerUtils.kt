@@ -683,7 +683,6 @@ object YTPlayerUtils {
             return isSuccessful
         } catch (e: Exception) {
             Timber.tag(logTag).e(e, "Stream URL validation failed with exception")
-            reportException(e)
         }
         return false
     }
@@ -732,7 +731,6 @@ object YTPlayerUtils {
                     }
                     else -> {
                         Timber.tag(logTag).e(error, "Failed to get signature timestamp via NewPipe")
-                        reportException(error)
                     }
                 }
                 // The cipher player's STS is exactly the one the cipher will decipher with.
