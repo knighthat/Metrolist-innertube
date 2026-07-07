@@ -11,8 +11,8 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.annotation.MainThread
 import androidx.collection.ArrayMap
+import app.kreate.android.BuildConfig
 import com.metrolist.innertube.YouTube
-import com.metrolist.music.BuildConfig
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.Dispatchers
