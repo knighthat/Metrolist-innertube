@@ -1,5 +1,7 @@
 package com.metrolist.innertube
 
+import app.kreate.di.InternalPrefKey
+import app.kreate.di.Storage
 import app.kreate.preferences.Preferences
 import app.kreate.util.getSystemCountryCode
 import app.kreate.util.getSystemLanguageCode
@@ -41,7 +43,11 @@ import io.ktor.client.request.setBody
 import io.ktor.http.ContentType
 import io.ktor.http.contentType
 import io.ktor.http.userAgent
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.Json
 import org.koin.core.component.KoinComponent
@@ -56,7 +62,7 @@ import kotlin.io.encoding.ExperimentalEncodingApi
  * For making HTTP requests, not parsing response.
  */
 @OptIn(ExperimentalEncodingApi::class)
-class InnerTube : KoinComponent {
+class InnerTube : KoinComponent, Preferences.Listener {
     private var httpClient = createClient()
 
     private companion object {
@@ -87,6 +93,17 @@ class InnerTube : KoinComponent {
     var proxyAuth: String? = null
 
     var useLoginForBrowse: Boolean = false
+
+    init {
+        MainScope().launch {
+            Preferences.addListener( this@InnerTube )
+        }
+        if( Preferences.YOUTUBE_LOGIN.value ) {
+            visitorData = Preferences.YOUTUBE_VISITOR_DATA.value
+            dataSyncId = Preferences.YOUTUBE_SYNC_ID.value
+            cookie = Preferences.YOUTUBE_COOKIES.value
+        }
+    }
 
     @OptIn(ExperimentalSerializationApi::class)
     private fun createClient() = get<HttpClient>().config {
@@ -825,5 +842,23 @@ class InnerTube : KoinComponent {
 
         }
 
-
+    override suspend fun onChange( storage: Storage, key: InternalPrefKey<*> ) =
+        withContext( Dispatchers.Main ) {
+            when( key ) {
+                Preferences.Key.YOUTUBE_LOGIN -> {
+                    if( Preferences.YOUTUBE_LOGIN.value ) {
+                        visitorData = Preferences.YOUTUBE_VISITOR_DATA.value
+                        dataSyncId = Preferences.YOUTUBE_SYNC_ID.value
+                        cookie = Preferences.YOUTUBE_COOKIES.value
+                    } else {
+                        visitorData = null
+                        dataSyncId = null
+                        cookie = null
+                    }
+                }
+                Preferences.Key.YOUTUBE_VISITOR_DATA    -> visitorData = Preferences.YOUTUBE_VISITOR_DATA.value
+                Preferences.Key.YOUTUBE_SYNC_ID         -> dataSyncId = Preferences.YOUTUBE_SYNC_ID.value
+                Preferences.Key.YOUTUBE_COOKIES         -> cookie = Preferences.YOUTUBE_COOKIES.value
+            }
+        }
 }
