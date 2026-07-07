@@ -11,7 +11,7 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.annotation.MainThread
 import androidx.collection.ArrayMap
-import app.kreate.android.BuildConfig
+import app.kreate.util.IS_DEBUG
 import com.metrolist.innertube.YouTube
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineExceptionHandler
@@ -175,7 +175,7 @@ class PoTokenWebView private constructor(
      */
     @JavascriptInterface
     fun onJsInitializationError(error: String) {
-        if (BuildConfig.DEBUG) {
+        if( IS_DEBUG ) {
             Timber.tag(TAG).e("Initialization error from JavaScript: $error")
         }
         onInitializationErrorCloseAndCancel(buildExceptionForJsError(error))
@@ -292,7 +292,7 @@ class PoTokenWebView private constructor(
      */
     @JavascriptInterface
     fun onObtainPoTokenError(identifier: String, error: String) {
-        if (BuildConfig.DEBUG) {
+        if( IS_DEBUG ) {
             Timber.tag(TAG).e("obtainPoToken error from JavaScript: $error")
         }
         popPoTokenContinuation(identifier)?.resumeWithException(buildExceptionForJsError(error))
