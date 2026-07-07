@@ -1,5 +1,6 @@
 package com.metrolist.innertube
 
+import co.touchlab.kermit.Logger
 import com.metrolist.innertube.YouTube.newEpisodes
 import com.metrolist.innertube.models.AccountInfo
 import com.metrolist.innertube.models.AlbumItem
@@ -71,10 +72,12 @@ import com.metrolist.innertube.pages.SearchSummaryPage
 import com.metrolist.innertube.utils.parseTime
 import io.ktor.client.call.body
 import io.ktor.client.statement.bodyAsText
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
@@ -112,6 +115,19 @@ object YouTube {
         set(value) {
             innerTube.useLoginForBrowse = value
         }
+
+    suspend fun acquireVisitorData() {
+        if( visitorData != null ) return
+
+        visitorData()
+            .onFailure { err ->
+                Logger.e("", err, "MetrolistYouTube")
+            }
+            .onSuccess { newVisitorData ->
+                withContext( Dispatchers.Main ) { innerTube.visitorData = newVisitorData }
+                Logger.d( tag = "MetrolistYouTube" ) { "Fetched visitorData: $newVisitorData" }
+            }
+    }
 
     suspend fun searchSuggestions(query: String): Result<SearchSuggestions> =
         runCatching {
