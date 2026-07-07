@@ -25,15 +25,13 @@ import com.metrolist.innertube.models.YouTubeClient.Companion.WEB
 import com.metrolist.innertube.models.YouTubeClient.Companion.WEB_CREATOR
 import com.metrolist.innertube.models.YouTubeClient.Companion.WEB_REMIX
 import com.metrolist.innertube.models.response.PlayerResponse
-import com.metrolist.music.constants.AudioQuality
 import com.metrolist.music.utils.YTPlayerUtils.MAIN_CLIENT
 import com.metrolist.music.utils.YTPlayerUtils.STREAM_FALLBACK_CLIENTS
 import com.metrolist.music.utils.YTPlayerUtils.validateStatus
 import com.metrolist.music.utils.cipher.CipherDeobfuscator
-import com.metrolist.music.utils.cipher.FunctionNameExtractor
-import com.metrolist.music.utils.cipher.PlayerJsFetcher
 import com.metrolist.music.utils.potoken.PoTokenGenerator
 import com.metrolist.music.utils.potoken.PoTokenResult
+import it.fast4x.rimusic.enums.AudioQualityFormat
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -142,7 +140,7 @@ object YTPlayerUtils {
     suspend fun playerResponseForPlayback(
         videoId: String,
         playlistId: String? = null,
-        audioQuality: AudioQuality,
+        audioQuality: AudioQualityFormat,
         connectivityManager: ConnectivityManager,
     ): Result<PlaybackData> = runCatching {
         Timber.tag(TAG).d("=== PLAYER RESPONSE FOR PLAYBACK ===")
@@ -425,7 +423,7 @@ object YTPlayerUtils {
                     else -> 0
                 }
 
-                if (audioQuality == AudioQuality.HIGH && format.audioQuality != "AUDIO_QUALITY_HIGH" && hasHighQuality) {
+                if (audioQuality == AudioQualityFormat.High && format.audioQuality != "AUDIO_QUALITY_HIGH" && hasHighQuality) {
                     val isBetter = bestFallbackFormat == null ||
                         compareValuesBy(
                             format, bestFallbackFormat,
@@ -493,7 +491,7 @@ object YTPlayerUtils {
             }
         }
 
-        if (audioQuality == AudioQuality.HIGH && format?.audioQuality != "AUDIO_QUALITY_HIGH" && bestFallbackFormat != null) {
+        if (audioQuality == AudioQualityFormat.High && format?.audioQuality != "AUDIO_QUALITY_HIGH" && bestFallbackFormat != null) {
             Timber.tag(logTag).d("Using best fallback format: ${bestFallbackFormat.mimeType}, bitrate: ${bestFallbackFormat.bitrate}")
             format = bestFallbackFormat
             streamUrl = bestFallbackUrl
@@ -581,7 +579,7 @@ object YTPlayerUtils {
 
     private fun findFormat(
         playerResponse: PlayerResponse,
-        audioQuality: AudioQuality,
+        audioQuality: AudioQualityFormat,
         connectivityManager: ConnectivityManager,
     ): PlayerResponse.StreamingData.Format? {
         Timber.tag(logTag).d("Finding format with audioQuality: $audioQuality, network metered: ${connectivityManager.isActiveNetworkMetered}")
@@ -600,7 +598,7 @@ object YTPlayerUtils {
         }
 
         val format = when (audioQuality) {
-            AudioQuality.HIGH -> {
+            AudioQualityFormat.High -> {
                 audioCapableFormats.maxWithOrNull(
                     compareBy<PlayerResponse.StreamingData.Format> { format ->
                         when (format.audioQuality) {
@@ -615,7 +613,7 @@ object YTPlayerUtils {
                 )
             }
 
-            AudioQuality.LOW -> {
+            AudioQualityFormat.Low -> {
                 val cappedFormats = audioCapableFormats.filter { it.bitrate <= 128000 }
                 val lowFormat = cappedFormats
                     .filter { it.isOriginal }
@@ -633,7 +631,7 @@ object YTPlayerUtils {
                 lowFormat
             }
 
-            AudioQuality.AUTO -> {
+            AudioQualityFormat.Auto -> {
                 val targetBitrate = if (connectivityManager.isActiveNetworkMetered) 128000.0 else maxBitrate.toDouble()
                 val cappedFormats = audioCapableFormats.filter { it.bitrate <= targetBitrate }
                 val autoFormat = cappedFormats
