@@ -38,15 +38,15 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
+import org.koin.core.component.KoinComponent
+import org.koin.core.component.get
 import timber.log.Timber
 
-object YTPlayerUtils {
+object YTPlayerUtils : KoinComponent {
     private const val logTag = "YTPlayerUtils"
     private const val TAG = "YTPlayerUtils"
 
-    private val httpClient = OkHttpClient.Builder()
-        .proxy(YouTube.proxy)
-        .build()
+    private val httpClient: OkHttpClient get() = get()
 
     private val poTokenGenerator = PoTokenGenerator()
 

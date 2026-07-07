@@ -1,10 +1,11 @@
 package com.metrolist.music.utils.cipher
 
-import com.metrolist.innertube.YouTube
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import org.koin.core.component.KoinComponent
+import org.koin.core.component.get
 import timber.log.Timber
 import java.io.File
 
@@ -14,15 +15,13 @@ import java.io.File
  * The player.js contains the signature deobfuscation and n-transform functions
  * that are required to access stream URLs on web clients.
  */
-object PlayerJsFetcher {
+object PlayerJsFetcher : KoinComponent {
     private const val TAG = "Metrolist_CipherFetcher"
     private const val IFRAME_API_URL = "https://www.youtube.com/iframe_api"
     private const val PLAYER_JS_URL_TEMPLATE = "https://www.youtube.com/s/player/%s/player_ias.vflset/en_GB/base.js"
     private const val CACHE_TTL_MS = 6 * 60 * 60 * 1000L // 6 hours
 
-    private val httpClient = OkHttpClient.Builder()
-        .proxy(YouTube.proxy)
-        .build()
+    private val httpClient : OkHttpClient get() = get()
 
     // Regex to extract player hash from iframe_api response
     private val PLAYER_HASH_REGEX = Regex("""\\?/s\\?/player\\?/([a-zA-Z0-9_-]+)\\?/""")

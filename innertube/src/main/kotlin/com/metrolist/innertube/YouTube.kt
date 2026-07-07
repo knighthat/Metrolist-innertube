@@ -1,5 +1,6 @@
 package com.metrolist.innertube
 
+import com.metrolist.innertube.YouTube.newEpisodes
 import com.metrolist.innertube.models.AccountInfo
 import com.metrolist.innertube.models.AlbumItem
 import com.metrolist.innertube.models.Artist
@@ -8,15 +9,12 @@ import com.metrolist.innertube.models.BrowseEndpoint
 import com.metrolist.innertube.models.EpisodeItem
 import com.metrolist.innertube.models.GridRenderer
 import com.metrolist.innertube.models.MediaInfo
-import com.metrolist.innertube.models.MusicCarouselShelfRenderer
-import com.metrolist.innertube.models.MusicMultiRowListItemRenderer
 import com.metrolist.innertube.models.MusicResponsiveListItemRenderer
 import com.metrolist.innertube.models.MusicShelfRenderer
 import com.metrolist.innertube.models.MusicTwoRowItemRenderer
 import com.metrolist.innertube.models.PlaylistItem
 import com.metrolist.innertube.models.PodcastItem
 import com.metrolist.innertube.models.Run
-import com.metrolist.innertube.models.Runs
 import com.metrolist.innertube.models.SearchSuggestions
 import com.metrolist.innertube.models.SectionListRenderer
 import com.metrolist.innertube.models.SongItem
@@ -32,8 +30,6 @@ import com.metrolist.innertube.models.YouTubeLocale
 import com.metrolist.innertube.models.getContinuation
 import com.metrolist.innertube.models.getItems
 import com.metrolist.innertube.models.oddElements
-import com.metrolist.innertube.models.splitBySeparator
-import com.metrolist.innertube.utils.parseTime
 import com.metrolist.innertube.models.response.AccountMenuResponse
 import com.metrolist.innertube.models.response.BrowseResponse
 import com.metrolist.innertube.models.response.CreatePlaylistResponse
@@ -46,6 +42,7 @@ import com.metrolist.innertube.models.response.ImageUploadResponse
 import com.metrolist.innertube.models.response.NextResponse
 import com.metrolist.innertube.models.response.PlayerResponse
 import com.metrolist.innertube.models.response.SearchResponse
+import com.metrolist.innertube.models.splitBySeparator
 import com.metrolist.innertube.pages.AlbumPage
 import com.metrolist.innertube.pages.ArtistItemsContinuationPage
 import com.metrolist.innertube.pages.ArtistItemsPage
@@ -71,13 +68,13 @@ import com.metrolist.innertube.pages.SearchResult
 import com.metrolist.innertube.pages.SearchSuggestionPage
 import com.metrolist.innertube.pages.SearchSummary
 import com.metrolist.innertube.pages.SearchSummaryPage
+import com.metrolist.innertube.utils.parseTime
 import io.ktor.client.call.body
 import io.ktor.client.statement.bodyAsText
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.runBlocking
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
@@ -95,26 +92,10 @@ object YouTube {
     private val innerTube = InnerTube()
     private const val ENABLE_NEWPIPE_STREAM_INFO_EXTRACTOR = false
 
-    var locale: YouTubeLocale
-        get() = innerTube.locale
-        set(value) {
-            innerTube.locale = value
-        }
-    var visitorData: String?
-        get() = innerTube.visitorData
-        set(value) {
-            innerTube.visitorData = value
-        }
-    var dataSyncId: String?
-        get() = innerTube.dataSyncId
-        set(value) {
-            innerTube.dataSyncId = value
-        }
-    var cookie: String?
-        get() = innerTube.cookie
-        set(value) {
-            innerTube.cookie = value
-        }
+    val locale: YouTubeLocale get() = innerTube.locale
+    val visitorData: String? get() = innerTube.visitorData
+    val dataSyncId: String? get() = innerTube.dataSyncId
+    val cookie: String? get() = innerTube.cookie
     var proxy: Proxy?
         get() = innerTube.proxy
         set(value) {
