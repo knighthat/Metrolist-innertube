@@ -3,8 +3,8 @@ package com.metrolist.innertube
 import app.kreate.di.InternalPrefKey
 import app.kreate.di.Storage
 import app.kreate.preferences.Preferences
-import app.kreate.util.getSystemCountryCode
-import app.kreate.util.getSystemLanguageCode
+import app.kreate.utils.getSystemCountryCode
+import app.kreate.utils.getSystemLanguageCode
 import com.metrolist.innertube.models.Context
 import com.metrolist.innertube.models.MediaInfo
 import com.metrolist.innertube.models.ReturnYouTubeDislikeResponse
